@@ -1,6 +1,7 @@
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from transformers import PreTrainedModel
 import torch
+import torch.nn.functional as F
 from typing import List, Dict, Tuple, Any
 from abc import abstractmethod
 import numpy as np
@@ -38,6 +39,20 @@ class BaseMetric:
 
         """
         raise NotImplementedError
+
+
+class MSEMetric(BaseMetric):
+    """Computes Mean Squared Error between generated and reference texts"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    def compute(
+        self, generated_score: torch.Tensor, reference_score: torch.Tensor
+    ) -> Dict[str, float]:
+        score = F.mse_loss(generated_score, reference_score)
+        return {"semantic/mse": (None, score.item())}
 
 
 class LearnedRewardMetric(BaseMetric):
@@ -158,38 +173,6 @@ class RougeMetric(BaseMetric):
             metric_dict[f"lexical/rouge_{rouge_type}"] = (None, rouge_score)
         return metric_dict
 
-
-class MSEMetric(BaseMetric):
-    def __init__(self, use_single_ref: bool = True) -> None:
-        super().__init__()
-        self._metric = load_metric("rouge", seed=0)
-        self._use_single_ref = use_single_ref
-
-    def compute(
-        self,
-        prompt_texts: List[str],
-        generated_texts: List[str],
-        reference_texts: List[List[str]],
-        meta_infos: List[Dict[str, Any]] = None,
-        model: PreTrainedModel = None,
-        split_name: str = None,
-    ):
-        if self._use_single_ref:
-            # TBD: this is required for CNN/DM dataset, without this we get low scores
-            # TBD: needs investigation
-            ref_texts = [ref[0] for ref in reference_texts]
-        else:
-            ref_texts = reference_texts
-
-        metric_results = self._metric.compute(
-            predictions=generated_texts, references=ref_texts, use_stemmer=True
-        )
-        score_keys = ["rouge1", "rouge2", "rougeL", "rougeLsum"]
-        metric_dict = {}
-        for rouge_type in score_keys:
-            rouge_score = metric_results[rouge_type].mid.fmeasure
-            metric_dict[f"lexical/rouge_{rouge_type}"] = (None, rouge_score)
-        return metric_dict
 
 class BERTScoreMetric(BaseMetric):
     def __init__(self, language: str) -> None:

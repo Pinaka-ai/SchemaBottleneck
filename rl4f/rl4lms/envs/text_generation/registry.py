@@ -24,6 +24,7 @@ from rl4lms.envs.text_generation.metric import (
     SacreBLEUMetric,
     TERMetric,
     chrFmetric,
+    MSEMetric,
 )
 from rl4lms.data_pools.custom_text_generation_pools import (
     IMDB,
@@ -39,7 +40,7 @@ from rl4lms.data_pools.custom_text_generation_pools import (
     CRD3DialogueGeneration,
     Interscript,
     OpenAISumm,
-    Alphabetize
+    Alphabetize,
 )
 from rl4lms.envs.text_generation.test_metric import IncreasingNumbersinText, DateInText
 from rl4lms.data_pools.text_generation_pool import TextGenPool
@@ -60,6 +61,7 @@ from rl4lms.envs.text_generation.reward import (
     RougeLMaxRewardFunction,
     TER,
     chrF,
+    MSERewardFunction,
 )
 from typing import Dict, Type, Any, Union
 from rl4lms.envs.text_generation.policy import (
@@ -132,6 +134,7 @@ class RewardFunctionRegistry:
         "ter": TER,
         "chrf": chrF,
         "editmatch": EditMatch,
+        "mse": MSERewardFunction,
     }
 
     @classmethod
