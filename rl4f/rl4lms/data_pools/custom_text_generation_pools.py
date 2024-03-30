@@ -13,6 +13,49 @@ import json
 from myutil import ForkedPdb
 
 
+class Morality(TextGenPool):
+    @classmethod
+    def prepare(
+        cls,
+        split: str,
+        stage: str,
+        prompt_prefix: str = "",
+        truncate_article: int = None,
+        max_size: int = None,
+    ):
+        if split == "train":
+            pth = f"projectnb/llamagrp/feyzanb/feedback/data/morality/morality_{split}.jsonl"  # TODO: change file names
+        elif split == "val":
+            pth = "projectnb/llamagrp/feyzanb/feedback/data/morality/morality_train.jsonl"
+        elif split == "test":
+            pth = "projectnb/llamagrp/feyzanb/feedback/data/morality/morality_train.jsonl"
+        else:
+            raise ValueError("Split not supported")
+
+        data = []
+        with open(pth, "r") as f:
+            for line in f:
+                data.append(json.loads(line))
+        
+
+        samples = []
+        for ix, item in enumerate(data):
+            if isinstance(item["human_score"], list):
+                item["human_score"] = [item["human_score"]]
+            sample = Sample(
+                id=f"{split}_{ix}",
+                prompt_or_input_text=prompt_prefix + item["scenario"],
+                references=item["human_score"],
+            )
+            samples.append(sample)
+
+            if max_size is not None and ix == (max_size - 1):
+                break
+
+        pool_instance = cls(samples)
+        return pool_instance
+
+
 class Interscript(TextGenPool):
     @classmethod
     def prepare(
@@ -25,11 +68,11 @@ class Interscript(TextGenPool):
     ):
         # Read the data
         if split == "train":
-            pth = f"/projectnb/llamagrp/feyzanb/feedback/data/interscript/train_n1158_target_edit_numeric_group_goal_steps_{stage}.json"
+            pth = f"projectnb/llamagrp/feyzanb/feedback/data/interscript/train_n1158_target_edit_numeric_group_goal_steps_{stage}.json"
         elif split == "val":
-            pth = f"/projectnb/llamagrp/feyzanb/feedback/data/interscript/dev_n190_target_edit_numeric_group_goal_steps_{stage}.json"
+            pth = f"projectnb/llamagrp/feyzanb/feedback/data/interscript/dev_n190_target_edit_numeric_group_goal_steps_{stage}.json"
         elif split == "test":
-            pth = f"/projectnb/llamagrp/feyzanb/feedback/data/interscript/test_n678_target_edit_numeric_group_goal_steps_{stage}.json"
+            pth = f"projectnb/llamagrp/feyzanb/feedback/data/interscript/test_n678_target_edit_numeric_group_goal_steps_{stage}.json"
         else:
             raise ValueError("Split not supported")
 
@@ -68,11 +111,11 @@ class OpenAISumm(TextGenPool):
     ):
         # Read the data
         if split == "train":
-            pth = f"/projectnb/llamagrp/feyzanb/feedback/data/openai_summ/topic/train_passage_question_answer_2_{stage}.json"
+            pth = f"projectnb/llamagrp/feyzanb/feedback/data/openai_summ/topic/train_passage_question_answer_2_{stage}.json"
         elif split == "val":
-            pth = f"/projectnb/llamagrp/feyzanb/feedback/data/openai_summ/topic/dev_passage_question_answer_2_{stage}.json"
+            pth = f"projectnb/llamagrp/feyzanb/feedback/data/openai_summ/topic/dev_passage_question_answer_2_{stage}.json"
         elif split == "test":
-            pth = f"/projectnb/llamagrp/feyzanb/feedback/data/openai_summ/topic/test_passage_question_answer_2_{stage}.json"
+            pth = f"projectnb/llamagrp/feyzanb/feedback/data/openai_summ/topic/test_passage_question_answer_2_{stage}.json"
         else:
             raise ValueError("Split not supported")
 
@@ -111,11 +154,11 @@ class Alphabetize(TextGenPool):
     ):
         # Read the data
         if split == "train":
-            pth = f"/projectnb/llamagrp/feyzanb/feedback/data/alphabetize/train_{stage}.jsonl"
+            pth = f"projectnb/llamagrp/feyzanb/feedback/data/alphabetize/train_{stage}.jsonl"
         elif split == "val":
-            pth = f"/projectnb/llamagrp/feyzanb/feedback/data/alphabetize/dev_{stage}.jsonl"
+            pth = f"projectnb/llamagrp/feyzanb/feedback/data/alphabetize/dev_{stage}.jsonl"
         elif split == "test":
-            pth = f"/projectnb/llamagrp/feyzanb/feedback/data/alphabetize/test_{stage}.jsonl"
+            pth = f"projectnb/llamagrp/feyzanb/feedback/data/alphabetize/test_{stage}.jsonl"
         else:
             raise ValueError("Split not supported")
 
