@@ -5,13 +5,13 @@ tokenizer:
   pad_token_as_eos_token: False
 
 reward_fn:
-  id: editmatch
+  id: mse
   args:
     metric:
       prompt_path: "./data/alphabetize/prompts.txt"
       separator: "\n\n---\n\n"
       downstream_metric_name: inverse_levenshtein_diff_exact_match
-      openai_key: openai_key
+      openai_key: "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"
       gpt3_model_name: code-davinci-002
       cache_path: "./alphabetize_output/cache.json"
       save_path: ""
@@ -22,7 +22,7 @@ reward_fn:
       pad_token_as_eos_token: False
   
 datapool:
-  id: alphabetize
+  id: morality
   args:
     prompt_prefix: "critique: "
     stage: ppo_sampled
@@ -52,7 +52,7 @@ alg:
   policy:
     id: seq2seq_lm_actor_critic_policy
     args:
-      model_name: ./alphabetize_output/alphabetize_sup_scale/t5large_bs32_wd0.01_lr1e-5_beam5_min5_max_20_seed0/model
+      model_name: projectnb/llamagrp/feyzanb/feedback/alphabetize_output/rl4f_alphabetize_sup/t5large_bs32_wd0.01_lr1e-5_beam5_min5_max_20_seed0/checkpoints/checkpoint-4500/
       apply_model_parallel: True
       prompt_truncation_side: "right"
       optimizer_kwargs:
@@ -75,12 +75,12 @@ train_evaluation:
     - id: rouge
     # - id: bleu
     #   args: {}
-    - id: editmatch
+    - id: mse
       args: 
         prompt_path: "./data/alphabetize/prompts.txt"
         separator: "\n\n---\n\n"
         downstream_metric_name: inverse_levenshtein_diff_exact_match
-        openai_key: openai_key
+        openai_key: "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"
         gpt3_model_name: code-davinci-002
         cache_path: "./alphabetize_output/cache.json"
     # - id: bert_score
