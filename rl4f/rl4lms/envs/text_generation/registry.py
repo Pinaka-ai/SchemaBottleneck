@@ -41,6 +41,7 @@ from rl4lms.data_pools.custom_text_generation_pools import (
     Interscript,
     OpenAISumm,
     Alphabetize,
+    Morality
 )
 from rl4lms.envs.text_generation.test_metric import IncreasingNumbersinText, DateInText
 from rl4lms.data_pools.text_generation_pool import TextGenPool
@@ -101,6 +102,7 @@ class DataPoolRegistry:
         "interscript": Interscript,
         "openai_summ": OpenAISumm,
         "alphabetize": Alphabetize,
+        "morality": Morality
     }
 
     @classmethod

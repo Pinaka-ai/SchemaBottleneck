@@ -83,6 +83,7 @@ train_evaluation:
         openai_key: "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"
         gpt3_model_name: code-davinci-002
         cache_path: "./alphabetize_output/cache.json"
+        save_path: ""
     # - id: bert_score
     #   args:
     #     language: en

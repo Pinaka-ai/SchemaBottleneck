@@ -293,9 +293,10 @@ class BLEURewardFunction(RewardFunction):
 
 
 class MSERewardFunction(RewardFunction):
-    def __init__(self) -> None:
+    def __init__(self,**kwargs) -> None:
         super().__init__()
-        self._metric = MSEMetric()
+        self._metric = MSEMetric(**kwargs["metric"])
+        
 
     def __call__(
         self,
