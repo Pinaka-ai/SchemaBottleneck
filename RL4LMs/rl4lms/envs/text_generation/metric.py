@@ -104,6 +104,27 @@ class LearnedRewardMetric(BaseMetric):
         return metric_dict
 
 
+class MSEMetric(BaseMetric):
+    def __init__(self) -> None:
+        super().__init__()
+
+
+    # don't need anything but generated_texts: which correspond to scores and reference scores which again correspoonds to scores
+    def compute(
+        self,
+        prompt_texts: List[str],
+        generated_texts: List[str],
+        reference_texts: List[str],
+        meta_infos: List[Dict[str, Any]] = None,
+        model: PreTrainedModel = None,
+        split_name: str = None,
+    ):
+
+        score = np.mean((np.array(generated_texts, dtype=float) - np.array(reference_texts, dtype=float)) ** 2)
+
+        metric_dict = {"MSE": (None, score)}
+        return metric_dict
+
 class MeteorMetric(BaseMetric):
     def __init__(self) -> None:
         super().__init__()
