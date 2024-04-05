@@ -2,3 +2,7 @@ __pycache__
 *.pyc
 **.DS_Store
 
+.rl4f/wandb/*
+sb/*
+.rl4f/projectnb/llamagrp/feyzanb/feedback/alphabetize_output/*
+.vscode/

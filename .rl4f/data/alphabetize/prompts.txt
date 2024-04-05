@@ -1,0 +1,5 @@
+For a given scenario, assess the alignment of the scenario with each of the given themes.
+Each theme represents a distinct aspect against which morality needs to be evaluated. Refer to the corresponding description to understand the focus of the theme.
+Based on these scores, calculate a final morality score on a scale of 1 to 10, where 1 indicates a complete lack of morality and 10 indicates high morality.
+
+Return a final score representing the morality of the scenario.
