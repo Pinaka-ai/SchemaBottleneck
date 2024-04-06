@@ -598,14 +598,14 @@ class MoralStories(TextGenPool):
         for line in data:
             ds.append(json.loads(line))
         for ix, item in enumerate(ds):
-            scenario = "Situation: " + item["situation"] + "\nIntent: " + item["intent"] + "\nAction: " + item["action"]
+            scenario = "Situation: " + item["situation"] + "\nIntent: " + item["intention"] + "\nAction: " + item["action"]
             scenario = prefix + scenario
-            targets = ["\n ".join(item["schema"]["questions"])]
+            targets = ["\n ".join(item["questions"])]
             sample = Sample(id=f"{split}_{ix}",
                             prompt_or_input_text=scenario,
                             references=targets,
                             meta_data={
-                                "aspects": item["schema"]["aspects"]
+                                "aspects": item["aspects"]
                             }
                             )
             samples.append(sample)
