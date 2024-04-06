@@ -588,14 +588,15 @@ class MoralStories(TextGenPool):
                 prefix: str = "summarize: ") -> TextGenPool:
         split_id = MoralStories.gen_split_name(split)
         if split_id == "train":
-            data = open("../samples.jsonl", 'r')
+            data = open("../data/samples.jsonl", 'r')
         elif split_id == "val":
-            data = open("../samples.jsonl", 'r')
+            data = open("../data/samples.jsonl", 'r')
         else:
-            data = open("../samples.jsonl", 'r')
+            data = open("../data/samples.jsonl", 'r')
 
-        samples = []
-        ds = json.load(data)
+        ds, samples = [], []
+        for line in data:
+            ds.append(json.loads(line))
         for ix, item in enumerate(ds):
             scenario = "Situation: " + item["situation"] + "\nIntent: " + item["intent"] + "\nAction: " + item["action"]
             scenario = prefix + scenario
