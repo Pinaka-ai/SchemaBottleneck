@@ -15,9 +15,12 @@ from rl4lms.envs.text_generation.metric import (
     TERMetric,
     chrFmetric,
     IntentAccuracyDailyDialog,
+    MSEMetric,
 )
 import numpy as np
 from typing import List, Dict, Any
+from openai import OpenAI
+
 
 
 class RewardFunction(ABC):
@@ -157,6 +160,39 @@ class MeteorRewardFunction(RewardFunction):
                 )
                 score = score + aux_score
             return score
+        return 0
+
+
+class MSERewardFunction(RewardFunction):
+    def __init__(self) -> None:
+        super().__init__()
+        self._metric = MSEMetric()
+
+    def __call__(
+        self,
+        current_observation: Observation,
+        action: int,
+        next_observation: Observation,
+        done: bool,
+        meta_info: Dict[str, Any] = None,
+    ) -> float:
+        if done:
+            human_score = current_observation.target_or_reference_texts
+            predicted_schema = current_observation.context_text
+
+            ## Make a call to openai
+            open_ai_prompt = f"Given a scenario: {current_observation.prompt_or_input_text}, Evaluate the morarlity of the scenario " + \
+            + f" based on following criterias/question: {predicted_schema} and output just a final morality score between -5 to 5."
+
+            client = OpenAI(api_key="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")
+            morality_score_predicted = client.chat.completions.create(
+            model="gpt-3",
+            messages=[{"role": "user", "content": open_ai_prompt},]
+            ).choices[0].message.content.strip()
+            
+            metric_results = self._metric.compute(None, [morality_score_predicted], [human_score])
+            mse_score = metric_results["mse"][-1]
+            return mse_score
         return 0
 
 
