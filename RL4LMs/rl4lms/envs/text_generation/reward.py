@@ -186,10 +186,10 @@ class MSERewardFunction(RewardFunction):
 
             client = OpenAI(api_key="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")
             morality_score_predicted = client.chat.completions.create(
-            model="gpt-3",
+            model="gpt-4",
             messages=[{"role": "user", "content": open_ai_prompt},]
             ).choices[0].message.content.strip()
-            
+
             metric_results = self._metric.compute(None, [morality_score_predicted], [human_score])
             mse_score = metric_results["mse"][-1]
             return mse_score
