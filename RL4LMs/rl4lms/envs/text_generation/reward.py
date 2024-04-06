@@ -186,7 +186,7 @@ class MSERewardFunction(RewardFunction):
 
             client = OpenAI(api_key="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")
             morality_score_predicted = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": open_ai_prompt},]
             ).choices[0].message.content.strip()
 
