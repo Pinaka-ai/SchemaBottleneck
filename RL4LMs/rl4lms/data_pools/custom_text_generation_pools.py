@@ -582,6 +582,49 @@ class DailyDialog(TextGenPool):
         return dp_instance
 
 
+class MoralStories(TextGenPool):
+    @classmethod
+    def prepare(cls, split: str,
+                prefix: str = "summarize: ") -> TextGenPool:
+        split_id = MoralStories.gen_split_name(split)
+        if split_id == "train":
+            data = open("../data/samples.jsonl", 'r')
+        elif split_id == "val":
+            data = open("../data/samples.jsonl", 'r')
+        else:
+            data = open("../data/samples.jsonl", 'r')
+
+        ds, samples = [], []
+        for line in data:
+            ds.append(json.loads(line))
+        for ix, item in enumerate(ds):
+            scenario = "Situation: " + item["situation"] + "\nIntent: " + item["intention"] + "\nAction: " + item["action"]
+            scenario = prefix + scenario
+            targets = ["\n ".join(item["questions"])]
+            sample = Sample(id=f"{split}_{ix}",
+                            prompt_or_input_text=scenario,
+                            references=targets,
+                            meta_data={
+                                "aspects": item["aspects"]
+                            }
+                            )
+            samples.append(sample)
+        pool_instance = cls(samples)
+        return pool_instance
+
+    @staticmethod
+    def gen_split_name(split: str):
+        if split == "train":
+            split_name = "train"
+        elif split == "val":
+            split_name = "validation"
+        elif split == "test":
+            split_name = "test"
+        else:
+            raise NotImplementedError
+        return split_name
+
+
 if __name__ == "__main__":
     from transformers import AutoTokenizer
     import numpy as np
