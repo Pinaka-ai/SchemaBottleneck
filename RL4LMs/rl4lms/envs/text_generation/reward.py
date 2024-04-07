@@ -19,7 +19,8 @@ from rl4lms.envs.text_generation.metric import (
 )
 import numpy as np
 from typing import List, Dict, Any
-from openai import OpenAI
+# from openai import OpenAI
+import openai
 
 
 
@@ -184,10 +185,20 @@ class MSERewardFunction(RewardFunction):
             open_ai_prompt = f"Given a scenario: {current_observation.prompt_or_input_text}, Evaluate the morarlity of the scenario " + \
             + f" based on following criterias/question: {predicted_schema} and output just a final morality score between -5 to 5."
 
-            client = OpenAI(api_key="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")
-            morality_score_predicted = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": open_ai_prompt},]
+            # client = OpenAI(api_key="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")
+            # morality_score_predicted = client.chat.completions.create(
+            # model="gpt-3.5-turbo",
+            # messages=[{"role": "user", "content": open_ai_prompt},]
+            # ).choices[0].message.content.strip()
+            openai.api_key = "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"
+            morality_score_predicted = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                     messages=[
+                        {
+                        "role": "user",
+                        "content": open_ai_prompt
+                    }
+                    ]
             ).choices[0].message.content.strip()
 
             metric_results = self._metric.compute(None, [morality_score_predicted], [human_score])

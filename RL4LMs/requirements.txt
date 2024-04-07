@@ -21,3 +21,4 @@ sacrebleu==2.2.0
 py-rouge==1.1
 absl-py
 six
+openai==0.9
