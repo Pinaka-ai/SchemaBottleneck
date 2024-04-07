@@ -206,6 +206,43 @@ class CNNDailyMail(TextGenPool):
         return pool_instance
 
 
+class Morality(TextGenPool):
+    @classmethod
+    def prepare(
+        cls,
+        split: str,
+        prompt_prefix: str = "",
+        max_size: int = None,
+    ):
+        if split in ["train","test","val"]:
+            pth = f"data/morality/morality_train.jsonl"  
+        else:
+            raise ValueError("Split not supported")
+
+        data = []
+        with open(pth, "r") as f:
+            for line in f:
+                data.append(json.loads(line))
+
+
+        samples = []
+        for ix, item in enumerate(data):
+            if isinstance(item["human_score"], list):
+                item["human_score"] = [item["human_score"]]
+            sample = Sample(
+                id=f"{split}_{ix}",
+                prompt_or_input_text=prompt_prefix + item["scenario"],
+                references=item["human_score"],
+            )
+            samples.append(sample)
+
+            if max_size is not None and ix == (max_size - 1):
+                break
+
+        pool_instance = cls(samples)
+        return pool_instance
+
+
 class IMDB(TextGenPool):
     """
     IMDB Dataset for sentiment continuation task

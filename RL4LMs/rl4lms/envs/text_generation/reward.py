@@ -201,6 +201,8 @@ class MSERewardFunction(RewardFunction):
                     ]
             ).choices[0].message.content.strip()
 
+            print("=="*5, morality_score_predicted)
+
             metric_results = self._metric.compute(None, [morality_score_predicted], [human_score])
             mse_score = metric_results["mse"][-1]
             return mse_score

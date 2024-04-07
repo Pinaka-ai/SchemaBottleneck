@@ -10,9 +10,9 @@ reward_fn:
   #   rouge_type: "rouge1"
 
 datapool:
-  id: cnn_daily_mail
+  id: morality
   args:
-    prompt_prefix: "Evaluate the morality: "
+    prompt_prefix: "Generate a set of questions to evaluate morality: "
 
 
 env:
@@ -37,7 +37,7 @@ alg:
     coeff: 0.001
     target_kl: 0.2
   policy:
-    id: causal_lm_actor_critic_policy
+    id: seq2seq_lm_actor_critic_policy
     args:
       model_name: t5-base
       apply_model_parallel: True
