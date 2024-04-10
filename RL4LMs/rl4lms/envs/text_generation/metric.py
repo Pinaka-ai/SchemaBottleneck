@@ -16,7 +16,7 @@ from rl4lms.data_pools.custom_text_generation_pools import DailyDialog
 from tqdm import tqdm
 import copy
 import rouge
-
+import openai
 
 class BaseMetric:
     @abstractmethod
@@ -119,7 +119,7 @@ class MSEMetric(BaseMetric):
         model: PreTrainedModel = None,
         split_name: str = None,
     ):
-
+        print("&"*5, generated_texts, "^"*5, reference_texts, "#####^^", prompt_texts)
         score = np.mean((np.array(generated_texts, dtype=float) - np.array(reference_texts, dtype=float)) ** 2)
 
         metric_dict = {"MSE": (None, score)}
@@ -166,7 +166,7 @@ class RougeMetric(BaseMetric):
         if self._use_single_ref:
             # TBD: this is required for CNN/DM dataset, without this we get low scores
             # TBD: needs investigation
-            ref_texts = [ref[0] for ref in reference_texts]
+            ref_texts = [ref for ref in reference_texts]
         else:
             ref_texts = reference_texts
 

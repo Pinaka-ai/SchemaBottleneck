@@ -5,12 +5,12 @@ tokenizer:
   pad_token_as_eos_token: False
 
 reward_fn:
-  id: meteor
+  id: mse
   
 datapool:
-  id: cnn_daily_mail
+  id: morality
   args:
-    prompt_prefix: "Summarize: "
+    prompt_prefix: "Generate aspects for evaluating morality: "
 
 
 env:
@@ -26,7 +26,7 @@ alg:
   id: ppo
   args: 
     n_steps: 512
-    batch_size: 64
+    batch_size: 2
     verbose: 1
     learning_rate: 0.000002
     n_epochs: 5
@@ -37,7 +37,7 @@ alg:
   policy:
     id: seq2seq_lm_actor_critic_policy
     args:
-      model_name: rajkumarrrk/t5-base-fine-tuned-on-cnn-dm
+      model_name: tmp_sup/rl4lm_exps/rl4lm_experiment/model
       apply_model_parallel: True
       prompt_truncation_side: "right"
       generation_kwargs:
@@ -47,26 +47,26 @@ alg:
         max_new_tokens: 100
     
 train_evaluation:
-  eval_batch_size: 100
+  eval_batch_size: 2
   n_iters: 50
   eval_every: 10
   save_every: 1
   metrics:
-    - id: meteor
-      args: {}
-    - id: rouge
-    - id: bleu
-      args: {}
-    - id: bert_score
-      args:
-        language: en
-    # - id: bleurt
+    - id: mse
+    #   args: {}
+    # - id: rouge
+    # - id: bleu
+    #   args: {}
+    # - id: bert_score
     #   args:
-    #     config_name: bleurt-large-512
-    - id: diversity
-      args: {}
-    # - id: summaCZS
-    #   args:
+    #     language: en
+    # # - id: bleurt
+    # #   args:
+    # #     config_name: bleurt-large-512
+    # - id: diversity
+    #   args: {}
+    # # - id: summaCZS
+    # #   args:
     #     granularity: sentence
     #     use_ent: True
     #     use_con: False

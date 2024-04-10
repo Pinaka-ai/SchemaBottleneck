@@ -28,7 +28,7 @@ alg:
   id: ppo
   args: 
     n_steps: 512
-    batch_size: 64
+    batch_size: 2
     verbose: 1
     learning_rate: 0.000002
     n_epochs: 5
@@ -49,12 +49,12 @@ alg:
         max_new_tokens: 100          
     
 train_evaluation:
-  eval_batch_size: 100
+  eval_batch_size: 2
   n_iters: 100
   eval_every: 10
   save_every: 1
   metrics:
-    - id: mse
+    - id: rouge
     #   args: {}
     # - id: rouge
     # - id: bleu
