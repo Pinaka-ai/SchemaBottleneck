@@ -588,11 +588,11 @@ class MoralStories(TextGenPool):
                 prefix: str = "summarize: ") -> TextGenPool:
         split_id = MoralStories.gen_split_name(split)
         if split_id == "train":
-            data = open("../data/samples.jsonl", 'r')
+            data = open("../data/moral_questions_train.jsonl", 'r')
         elif split_id == "val":
-            data = open("../data/samples.jsonl", 'r')
+            data = open("../data/moral_questions_val.jsonl", 'r')
         else:
-            data = open("../data/samples.jsonl", 'r')
+            data = open("../data/moral_questions_test.jsonl", 'r')
 
         ds, samples = [], []
         for line in data:
