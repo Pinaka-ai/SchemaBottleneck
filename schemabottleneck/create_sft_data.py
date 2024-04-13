@@ -10,85 +10,52 @@ import random
 gpt_config = json.load(open('./gpt_config.json'))
 api_key = gpt_config["api_key"]
 
-template = """
-    Description
-
-    Situation: Setting of the story that introduces story participants and describes their environment.
-    Intention: Reasonable goal that one of the story participants (the actor), wants to fulfill.
-    Norm: A guideline for social conduct generally observed by most people in everyday situations.
- 
-    You are now given a Situation, an Intent and the Norm. Return a list of {{num}} questions through which the morality
-    of the situation would be judged. 
-
-    Situation: {{situation}}
-    Intent: {{intent}}
-    Norm: {{norm}}
-
-    Your output format should be json:
-    {
-        questions: [] .. a list of questions
-    }
-"""
-
-template_1 = """
-    Description
-
-    Situation: Setting of the story that introduces story participants and describes their environment.
-    Intention: Reasonable goal that one of the story participants (the actor), wants to fulfill.
-    Norm: A guideline for social conduct generally observed by most people in everyday situations.
-    Action 1: An action by the actor that fulfills the intention and observes the norm.
-    Action 2: An action by the actor that fulfills the intention and diverges from the norm.
-
-    Create a list of aspects and questions for:
-
-    Situation: {{situation}}
-    Intent: {{intent}}
-    Norm: {{norm}}
-    Action 1: {{maction}}
-    Action 2: {{imaction}}
-
-    Follow the below instructions to generate a set of questions through which morality of the actions can be evaluated.
-
-    Instructions:
-    1: Create a list of aspects through which morality would be evaluated.
-    2: Create a question for each aspect created from step 1 using the below rules.
-
-    Rules:
-    1: The questions should be abstract and should be applicable to a other scenarios as well. 
-    2: The questions need to be framed in such a way that the response to each of the questions will quantitatively measure the presence of the aspect.
-    3: Ensure that the questions are agnostic of the Situation, Norm, Intent or Actions.
-    4: Focus on measuring the quality of presence of each aspect. 
-    5: Please don't use "rate on a scale of" in the questions.
-
-    Your output format should be json:
-    {
-      aspects: [] .. a list of aspects
-      questions: [] .. a list of questions
-    }
-"""
-
-generate_aspects = """
+def get_prompt(situation, intent, action):
+  prompt = f"""
   Description
 
   Situation: Setting of the story that introduces story participants and describes their environment.
   Intention: Reasonable goal that one of the story participants (the actor), wants to fulfill.
-  Norm: A guideline for social conduct generally observed by most people in everyday situations.
-  Action 1: An action by the actor that fulfills the intention and observes the norm.
-  Action 2: An action by the actor that fulfills the intention and diverges from the norm.
+  Action: The action of the actor in the give situation
 
   Create a list of abstract aspects for:
 
-  Situation: {{situation}}
-  Intent: {{intent}}
-  Norm: {{norm}}
-  Action 1: {{maction}}
-  Action 2: {{imaction}}
+  Situation: {situation}
+  Intent: {intent}
+  Action: {action}
 
   Follow the rules below to generate a set of aspects through which morality of the actions can be evaluated.
 
   Rules:
   1: The aspects should be abstract and should be applicable to a other scenarios as well. 
-  2: Ensure that an aspect is agnostic of the Situation, Norm, Intent and Actions.
+  2: Ensure that an aspect is agnostic of the Situation, Intent and Action.
+
+  Your output format should be json:
+  {{
+    aspects: [] .. a list of aspects
+  }}
+  """
+  
+  return prompt
+
+generate_aspects_immoral = """
+  Description
+
+  Situation: Setting of the story that introduces story participants and describes their environment.
+  Intention: Reasonable goal that one of the story participants (the actor), wants to fulfill.
+  Action: The action of the actor in the give situation
+
+  Create a list of abstract aspects for:
+
+  Situation: {{situation}}
+  Intent: {{intent}}
+  Action: {{imaction}}
+
+  Follow the rules below to generate a set of aspects through which morality of the actions can be evaluated.
+
+  Rules:
+  1: The aspects should be abstract and should be applicable to a other scenarios as well. 
+  2: Ensure that an aspect is agnostic of the Situation, Intent and Action.
 
   Your output format should be json:
   {
@@ -147,10 +114,11 @@ headers = {
 
 responses = []
 
-def gen_aspects():
+def gen_aspects(type_aspects="moral"):
   path_to_dataset = "./datasets/moral_stories/moral_stories_full.jsonl"
   data = [json.loads(obj) for obj in open(path_to_dataset).readlines()]
-  write_path = "./datasets/moral_stories/aspects.jsonl"
+  
+  write_path = f'./datasets/moral_stories/aspects_{type_aspects}.jsonl'
 
   for i in range(len(data)):
     situation = data[i]['situation']
@@ -159,24 +127,39 @@ def gen_aspects():
     maction = data[i]['moral_action']
     imaction = data[i]['immoral_action']
 
-    prompt = generate_aspects.replace("{{situation}}", situation).replace("{{intent}}", intention).replace("{{norm}}", norm).replace("{{maction}}", maction).replace("{{imaction}}", imaction)
+    if type_aspects == "moral":
+      # prompt = generate_aspects_moral.replace("{{situation}}", situation).replace("{{intent}}", intention).replace("{{norm}}", norm).replace("{{maction}}", maction)
+      prompt = get_prompt(situation, intention, maction)
+    else:
+      # prompt = generate_aspects_immoral.replace("{{situation}}", situation).replace("{{intent}}", intention).replace("{{norm}}", norm).replace("{{imaction}}", immaction)
+      prompt = get_prompt(situation, intention, imaction)
+
     payload = create_payload(gpt_config["model"], prompt, max_tokens=gpt_config["max_tokens"], temperature=gpt_config["temperature"])
     response = requests.post(gpt_config["api_base"], headers=headers, json=payload)
     
     try:
       schema = (response.json())['choices'][0]['message']['content']
-      obj = copy.deepcopy(data[i])
+      obj = {
+        "ID":  f'm_{data[i]["ID"]}' if type_aspects == 'moral' else f'im_{data[i]["ID"]}',
+        "norm": norm,
+        "intention": intention,
+        "action": maction if type_aspects == "moral" else imaction,
+        "consequence": data[i]["moral_consequence"] if type_aspects == "moral" else data[i]["immoral_consequence"]
+      }
+      # obj = copy.deepcopy(data[i])
       obj['aspects'] = json.loads(schema)['aspects']
+      print(obj)
     except:
       continue
 
     with jsonlines.open(write_path, mode='a') as writer:
-        writer.write(obj)
+      writer.write(obj)
 
-def gen_questions():
-  path_to_dataset = "./datasets/moral_stories/aspects.jsonl"
+def gen_questions(type_aspects="moral"):
+  path_to_dataset = f'./datasets/moral_stories/aspects_{type_aspects}.jsonl'
   data = [json.loads(obj) for obj in open(path_to_dataset).readlines()]
-  write_path = "./datasets/moral_stories/questions.jsonl"
+
+  write_path = f'./datasets/moral_stories/questions_{type_aspects}.jsonl'
 
   for i in range(len(data)):
     prompt = generate_questions.replace("{{aspects}}", str(data[i]['aspects']))
@@ -194,8 +177,10 @@ def gen_questions():
         writer.write(obj)
 
 def main():
-  gen_aspects()
-  gen_questions()
+  type_aspects = "immoral"
+
+  gen_aspects(type_aspects)
+  gen_questions(type_aspects)
 
 if __name__ == '__main__':
   main()
