@@ -38,31 +38,6 @@ def get_prompt(situation, intent, action):
   
   return prompt
 
-generate_aspects_immoral = """
-  Description
-
-  Situation: Setting of the story that introduces story participants and describes their environment.
-  Intention: Reasonable goal that one of the story participants (the actor), wants to fulfill.
-  Action: The action of the actor in the give situation
-
-  Create a list of abstract aspects for:
-
-  Situation: {{situation}}
-  Intent: {{intent}}
-  Action: {{imaction}}
-
-  Follow the rules below to generate a set of aspects through which morality of the actions can be evaluated.
-
-  Rules:
-  1: The aspects should be abstract and should be applicable to a other scenarios as well. 
-  2: Ensure that an aspect is agnostic of the Situation, Intent and Action.
-
-  Your output format should be json:
-  {
-    aspects: [] .. a list of aspects
-  }
-"""
-
 generate_questions = """
   You are given a list of aspects which will be used to evaluate a moral scenario.
 
@@ -115,10 +90,10 @@ headers = {
 responses = []
 
 def gen_aspects(type_aspects="moral"):
-  path_to_dataset = "./datasets/moral_stories/moral_stories_full.jsonl"
+  path_to_dataset = "./data/moral_stories/moral_stories_full.jsonl"
   data = [json.loads(obj) for obj in open(path_to_dataset).readlines()]
   
-  write_path = f'./datasets/moral_stories/aspects_{type_aspects}.jsonl'
+  write_path = f'./data/moral_stories/aspects_{type_aspects}.jsonl'
 
   for i in range(len(data)):
     situation = data[i]['situation']
@@ -128,10 +103,8 @@ def gen_aspects(type_aspects="moral"):
     imaction = data[i]['immoral_action']
 
     if type_aspects == "moral":
-      # prompt = generate_aspects_moral.replace("{{situation}}", situation).replace("{{intent}}", intention).replace("{{norm}}", norm).replace("{{maction}}", maction)
       prompt = get_prompt(situation, intention, maction)
     else:
-      # prompt = generate_aspects_immoral.replace("{{situation}}", situation).replace("{{intent}}", intention).replace("{{norm}}", norm).replace("{{imaction}}", immaction)
       prompt = get_prompt(situation, intention, imaction)
 
     payload = create_payload(gpt_config["model"], prompt, max_tokens=gpt_config["max_tokens"], temperature=gpt_config["temperature"])
@@ -146,7 +119,6 @@ def gen_aspects(type_aspects="moral"):
         "action": maction if type_aspects == "moral" else imaction,
         "consequence": data[i]["moral_consequence"] if type_aspects == "moral" else data[i]["immoral_consequence"]
       }
-      # obj = copy.deepcopy(data[i])
       obj['aspects'] = json.loads(schema)['aspects']
       print(obj)
     except:
@@ -156,10 +128,10 @@ def gen_aspects(type_aspects="moral"):
       writer.write(obj)
 
 def gen_questions(type_aspects="moral"):
-  path_to_dataset = f'./datasets/moral_stories/aspects_{type_aspects}.jsonl'
+  path_to_dataset = f'./data/moral_stories/aspects_{type_aspects}.jsonl'
   data = [json.loads(obj) for obj in open(path_to_dataset).readlines()]
 
-  write_path = f'./datasets/moral_stories/questions_{type_aspects}.jsonl'
+  write_path = f'./data/moral_stories/questions_{type_aspects}.jsonl'
 
   for i in range(len(data)):
     prompt = generate_questions.replace("{{aspects}}", str(data[i]['aspects']))
