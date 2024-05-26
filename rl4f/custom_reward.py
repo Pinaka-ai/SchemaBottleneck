@@ -1,14 +1,18 @@
 from rl4lms.envs.text_generation.observation import Observation
 from rl4lms.envs.text_generation.reward import RewardFunction
-from rl4lms.envs.text_generation.metric import BaseMetric, RougeMetric
+from rl4lms.envs.text_generation.metric import BaseMetric, RougeMetric, MSEMetric
 from typing import Dict, Any, List
 from transformers import AutoTokenizer
 from transformers import PreTrainedModel
 from myutil import get_generations_gpt3, ForkedPdb, levenshtein
 from numpy import mean
 import json
+import random
+import torch
 import os, re, string
 import ipdb
+import csv
+import numpy as np
 
 
 CALLS = 0
@@ -49,10 +53,12 @@ class EditMatchMetric(BaseMetric):
             "loose_exact_match",
             "inverse_levenshtein",
             "inverse_levenshtein_diff",
-            "inverse_levenshtein_diff_exact_match"
+            "inverse_levenshtein_diff_exact_match",
+            "mse"
             ]
 
         # Load prompt.
+        # print("-----", self.prompt)
         with open(self.prompt, "r") as f:
             self.prompt = f.read()
 
@@ -65,7 +71,7 @@ class EditMatchMetric(BaseMetric):
             with open(self.cache_path, "r") as f:
                 self.GPT3_CACHE = json.load(f)
 
-    def remove_prefix(self, text: str, prefixes: List[str]=["Critique: ", "critique: ", "passage:"]):
+    def remove_prefix(self, text: str, prefixes: List[str]=["Generate schema for evaluating morality: ", "generate schema for evaluating morality: ", "Generate a schema to evaluate morality:"]):
         for prefix in prefixes:
             if text.startswith(prefix):
                 return text[len(prefix):]
@@ -92,17 +98,16 @@ class EditMatchMetric(BaseMetric):
                 # Get text between "Question: " and "\n\nAnswer:"
                 it = input_text
                 it = it.replace("\n", " ")
-                question = re.search("Question: (.*)Answer:", it).group(1).strip()
+                # question = re.search("Question: (.*)Answer:", it).group(1).strip()
                 input_wfeed.append(
                     (
                         self.prompt
                         + self.separator
+                        + "Scenario: "
                         + input_text
-                        + "\n\nQuestion: "
-                        + question
-                        + " "
+                        + "\nSchema: \n"
                         + feedback_pred
-                        + "\n\nAnswer:"
+                        + "\n"
                     )
                 )
         else:
@@ -118,6 +123,9 @@ class EditMatchMetric(BaseMetric):
                 )
                 for input_text, feedback_pred in zip(inputs, generated_texts)
             ]
+        
+        # print("\n\nThis is input feed", input_wfeed)
+        # print("-----------------\n\n")
 
         if self.cache_path != "":
             
@@ -146,18 +154,90 @@ class EditMatchMetric(BaseMetric):
             input_wfeed = [x[1] for x in uncached_inputs]
 
         # Query GPT-3
-        edit_pred = get_generations_gpt3(
+
+        gpt_call_1 = get_generations_gpt3(
             ls=input_wfeed,
             model_name=self.model_name,
             clean_tok=True,
             stop=[self.separator, "Edit:", "Feedback:", "Question:"],
             temperature=0.0,
-            batch_size=20,
+            batch_size=1,
             max_length=150,
             penalty=0.0,
             n=1,
             keyfile=self.openai_api_key,
+            generate_json=True
         )
+
+        # print("\nThis is the intermediate step of ", gpt_call_1)
+        # print("-----------------\n\n")
+
+
+        message = """
+            You are given a set of virtues that assess the morality of a scenario. Each virtue has been assigned a score in the range of -4 to 4, reflecting the extent to which the associated moral virtue was impacted.
+
+            Score Interpretation:
+
+            Negative Scores [-4 to -1]: The virtue was negatively impacted, resulting in a negative moral evaluation.
+            Neutral Score [0]: The virtue was not significantly impacted.
+            Positive Scores [1 to 4]: The virtue was positively impacted, resulting in a positive moral evaluation.
+            
+            Virtues:
+
+            {{virtue set}}
+
+            Task:
+
+            Carefully analyze the individual scores of each virtue and choose the final morality score based on the virtues from the set [-4, -3, -2, -1, 0, 1, 2, 3, 4]
+            with -4 being highly immoral and 4 being highly moral.
+
+            Note: The morality score should be strictly an integer in the range -4 to 4.
+
+            Response Format:
+            Provide the score in strict JSON format:
+            
+            {
+                "morality_score": "... integer score in the range -4 to 4"
+            }
+        """
+
+        all_messages = []
+
+        for obj in gpt_call_1:
+            arr = []
+            for k, v in json.loads(obj).items():
+                arr.append(f'{k}: {v}')
+            
+            final_str = "\n".join(arr)
+            new_message = message.replace("{{virtue set}}", final_str)
+
+            all_messages.append(new_message)
+
+        final_preds = get_generations_gpt3(
+            ls=all_messages,
+            model_name=self.model_name,
+            clean_tok=True,
+            stop=[self.separator, "Edit:", "Feedback:", "Question:"],
+            temperature=0.0,
+            batch_size=1,
+            max_length=150,
+            penalty=0.0,
+            n=1,
+            keyfile=self.openai_api_key,
+            generate_json=True,
+            final_morality=True
+        )
+
+        # print("\n\nThis is the final GPT output, ", final_preds)
+
+        edit_pred = []
+        for obj in final_preds:
+            try:
+                edit_pred.append(str(json.loads(obj)["morality_score"]))
+            except:
+                edit_pred.append(str(0))
+
+        # print("\n\n This is the edit pred", edit_pred)
 
         if self.cache_path != "":
             # Update cache.
@@ -182,11 +262,14 @@ class EditMatchMetric(BaseMetric):
             edit_pred = [v for _, v in results]
 
         # If len(prompt_texts) = 1, then print.
-        if len(edit_pred) == 1:
-            print("!!! prompt_text:\t", prompt_texts)
-            print("!!! generated_text:\t", generated_texts)
-            print("!!! reference_texts:\t", reference_texts)
-            print("!!! edit_pred:\t", edit_pred)
+        if len(edit_pred) <= 2:
+            # print("!!! prompt_text:\t", prompt_texts)
+            # print("!!! generated_text:\t", generated_texts)
+            # print("!!! reference_texts:\t", reference_texts)
+            # print("!!! edit_pred:\t", edit_pred)
+            with open("data/ppo_generation.csv", mode="a", newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow([prompt_texts, generated_texts, reference_texts, edit_pred])
 
         if self.downstream_metric_name == "rouge_combined_plus_rouge_input":
             # Strip off the part that starts with "Question:", if any.
@@ -271,17 +354,26 @@ class EditMatch(RewardFunction):
             # 4. reward = metric(edit_pred, edit_gold)
 
             state = current_observation.input_encoded_pt
+            # print("STATEEETTEATET:", state)
             input_wfeed = self.tokenizer.decode(state[0], skip_special_tokens=True)
 
             # Get prompt and feedback separately.
             prompt_or_input_text = prev_observation.prompt_or_input_text
-            feedback_pred = input_wfeed.lstrip(prompt_or_input_text)
-            prompt_or_input_text = prompt_or_input_text.lstrip("Critique: ")
             edit_gold = current_observation.target_or_reference_texts
+
+            prompt_texts = prompt_or_input_text.split('###')
+            # print("This is edit_gold: ", edit_gold)
+            reference_texts = [float(a) for a in edit_gold.split('###')]
+
+            feedback_pred = input_wfeed.lstrip(prompt_or_input_text)
+            # print("This is the input prompt or input text: ", prompt_or_input_text)
+            # print("And this is the input wfeed: ", input_wfeed)
+            # print("And this is feedback that is schema generateion: ", feedback_pred)
+            prompt_or_input_text = prompt_or_input_text.lstrip("Critique: ")
             metric_dict = self.metric.compute(
-                prompt_texts=[prompt_or_input_text],
-                generated_texts=[feedback_pred],
-                reference_texts=[edit_gold],
+                prompt_texts=prompt_texts,
+                generated_texts=[feedback_pred] * len(prompt_texts),
+                reference_texts=reference_texts,
             )
             reward = metric_dict[
                 f"custom_metrics/editmatch_{self.metric.downstream_metric_name}"
@@ -289,6 +381,19 @@ class EditMatch(RewardFunction):
             return reward
 
         return 0
+
+
+def mse_metric(pred: List[str], ref: List[str]) -> float:
+    # pred = [float(json.loads(i)["morality_score"]) for i in pred]
+    pred = np.array([float(i) for i in pred])
+    ref = np.array([float(i) for i in ref])
+    res = MSEMetric().compute(torch.tensor(pred), torch.tensor(ref))
+    sign_reward = 16 * (pred * ref > 0)
+    mse_penalty = res['semantic/mse'][-1]
+
+    reward = sign_reward - mse_penalty.numpy()
+    print('reward obtained', reward)
+    return {"mse": reward.mean()}
 
 
 def rouge1_metric(pred: List[str], ref: List[List[str]]):
@@ -523,6 +628,7 @@ metric_map = {
     "inverse_levenshtein": inverse_levenshtein,
     "inverse_levenshtein_diff": inverse_levenshtein_diff,
     "inverse_levenshtein_diff_exact_match": inverse_levenshtein_diff_exact_match,
+    "mse": mse_metric
 }
 
 
@@ -531,13 +637,14 @@ metric_map = {
 # (can this be a list to track
 # rouge on feedback_pred vs feedback_gold and edit_pred vs edit_gold?)
 if __name__ == "__main__":
-    metric = EditMatch()
+    kwargs = {"tokenizer": "t5-base"}
+    metric = EditMatch(**kwargs)
 
     args = {
-        "downstream_metric_name": "rouge_combined",
+        "downstream_metric_name": "mse",
         "prompt_path": "data/interscript/prompts_edit_numeric.txt",
         "separator": "\n\n---\n\n",
-        "openai_key": "openai_key_me",
+        "openai_key": "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",
         "gpt3_model_name": "code-davinci-002",
         "cache_path": "data/interscript/cache.json",
         # "cache_path": "data/interscript/cache_prompts_edit_functional_test.json",

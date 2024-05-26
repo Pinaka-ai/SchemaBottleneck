@@ -91,6 +91,12 @@ def evaluate_on_samples(policy: BasePolicy,
         tracker.log_metrics(epoch, split_name, corpus_level_metrics)
 
 
+def remove_suffix(text: str, suffixes: List[str]=["Generate schema for evaluating morality: ", "generate schema for evaluating morality: "]):
+    for suffix in suffixes:
+        if text.startswith(suffix):
+            return text[:len(suffix)]
+    return text
+
 def generate_text(policy: BasePolicy,
                   tokenizer: AutoTokenizer,
                   samples: List[Sample],
@@ -99,7 +105,7 @@ def generate_text(policy: BasePolicy,
                   gen_kwargs: Dict[str, Any]
                   ):
     prompt_texts = [dt_control_token +
-                    sample.prompt_or_input_text for sample in samples]
+                    remove_suffix(sample.prompt_or_input_text) for sample in samples]
     generated_texts = policy.generate(tokenizer,
                                       prompt_texts,
                                       max_prompt_length,

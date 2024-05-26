@@ -48,12 +48,12 @@ class MSEMetric(BaseMetric):
         super().__init__()
         # self.downstream_metric_name = kwargs["downstream_metric_name"]
         # self.downstream_metric = metric_map[self.downstream_metric_name]
-        self.prompt = kwargs["prompt_path"]
-        self.separator = kwargs["separator"]
-        self.openai_api_key = kwargs["openai_key"]
-        self.model_name = kwargs["gpt3_model_name"]
-        self.cache_path = kwargs["cache_path"]
-        self.save_path = kwargs["save_path"]
+        # self.prompt = kwargs["prompt_path"]
+        # self.separator = kwargs["separator"]
+        # self.openai_api_key = kwargs["openai_key"]
+        # self.model_name = kwargs["gpt3_model_name"]
+        # self.cache_path = kwargs["cache_path"]
+        # self.save_path = kwargs["save_path"]
         # self.append_feedback_to_q = kwargs.get("append_feedback_to_q", False)
         # self.lambda_rouge_input = kwargs.get("lambda_rouge_input", 0.3)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -62,7 +62,7 @@ class MSEMetric(BaseMetric):
         self, generated_score: torch.Tensor, reference_score: torch.Tensor
     ) -> Dict[str, float]:
         score = F.mse_loss(generated_score, reference_score)
-        return {"semantic/mse": (None, score.item())}
+        return {"semantic/mse": (None, score)}
 
 
 class LearnedRewardMetric(BaseMetric):

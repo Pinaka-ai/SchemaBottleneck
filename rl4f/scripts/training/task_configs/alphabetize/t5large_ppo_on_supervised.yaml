@@ -8,7 +8,7 @@ reward_fn:
   id: mse
   args:
     metric:
-      prompt_path: "./data/alphabetize/prompts.txt"
+      prompt_path: "./rl4f/data/alphabetize/prompts.txt"
       separator: "\n\n---\n\n"
       downstream_metric_name: inverse_levenshtein_diff_exact_match
       openai_key: "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"
@@ -72,7 +72,7 @@ train_evaluation:
   metrics:
     # - id: meteor
     #   args: {}
-    - id: rouge
+    # - id: rouge
     # - id: bleu
     #   args: {}
     - id: mse
@@ -90,8 +90,8 @@ train_evaluation:
     # - id: bleurt
     #   args:
     #     config_name: bleurt-large-512
-    - id: diversity
-      args: {}
+    # - id: diversity
+      # args: {}
     # - id: summaCZS
     #   args:
     #     granularity: sentence

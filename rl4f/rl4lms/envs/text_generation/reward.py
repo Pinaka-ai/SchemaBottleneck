@@ -309,6 +309,7 @@ class MSERewardFunction(RewardFunction):
         if done:
             references = [next_observation.target_or_reference_texts]
             predicted = [next_observation.context_text]
+
             metric_results = self._metric.compute(None, predicted, references)
             mse_score = metric_results["semantic/mse"][-1]
             return mse_score

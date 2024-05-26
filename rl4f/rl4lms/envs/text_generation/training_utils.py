@@ -198,7 +198,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
     def train_and_eval(self):
         # evaluate on val and test set before fine-tuning once
         iter_start = self._trainer_state["current_iter"]
-        self._evaluate_on_datapools(epoch=iter_start)
+        # self._evaluate_on_datapools(epoch=iter_start)
 
         # train for given number of iters
         for epoch in range(iter_start, self._n_iters):
@@ -212,14 +212,16 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
             if (epoch + 1) % self._train_eval_config.get("save_every", 20) == 0:
                 self.save_trainer_state(
                     self._tracker, self._alg.policy, self._trainer_state)
+            
+            print(f'{epoch}: *'*200)
 
             # evaluate on val and test set in the given intervals
-            if (epoch + 1) % self._train_eval_config["eval_every"] == 0:
-                self._evaluate_on_datapools(epoch=epoch, splits=["val", "test"])
+            # if (epoch + 1) % self._train_eval_config["eval_every"] == 0:
+                # self._evaluate_on_datapools(epoch=epoch, splits=["val", "test"])
 
 
         # finally evaluate on val and test samples
-        self._evaluate_on_datapools(epoch=epoch)
+        # self._evaluate_on_datapools(epoch=epoch)
 
         # save model here - we save only the language model
         if self._tracker is not None:

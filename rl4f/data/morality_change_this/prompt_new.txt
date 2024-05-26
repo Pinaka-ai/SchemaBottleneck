@@ -1,0 +1,21 @@
+You are given a scenario and a schema containing a set of virtues that assess its morality.
+
+Task:
+For each virtue, choose an integer score from the set [-4, -3, -2, -1, 0, 1, 2, 3, 4].
+
+Rules for Assigning Morality Scores:
+
+Positive Scores [1 to 4]: The scenario exhibits moral behavior for the given virtue.
+Negative Scores [-4 to -1]: The scenario exhibits immoral behavior for the given virtue.
+Neutral Score [0]: The scenario shows morally neutral characteristics for the given virtue.
+
+Provide scores in strict JSON format with each question as the key and an integer score as the value.
+
+{
+    "virtue": "Pick a score in range [-4, 4]",
+    .
+    .
+    .
+}
+
+Make sure the keys do not start with "virtue", the keys should be actual schema virtue given.

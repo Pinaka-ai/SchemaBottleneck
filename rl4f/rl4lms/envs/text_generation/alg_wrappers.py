@@ -123,6 +123,8 @@ def wrap_onpolicy_alg(alg_class: Type[OnPolicyAlgorithm],
             value_past_state = None
             ref_past_state = None
             policy_past_state = None
+
+
             masks = gen_output.get(
                 "action_masks", [None] * len(gen_output["step_wise_logprobs"]))
             for actions_tensor, log_probs, action_mask in zip(gen_output["step_wise_actions"],
@@ -132,6 +134,7 @@ def wrap_onpolicy_alg(alg_class: Type[OnPolicyAlgorithm],
                 # sanity check
                 assert torch.all(torch.isfinite(log_probs)
                                  ), "Infinite values in log probs"
+
 
                 # if all episodes are done, just break and do not continue
                 if np.all(ep_terminated):
@@ -180,6 +183,7 @@ def wrap_onpolicy_alg(alg_class: Type[OnPolicyAlgorithm],
                 actions = actions_tensor.cpu().numpy()
                 new_obs, rewards, dones, infos = self.env.step(actions)
 
+               
                 self.num_timesteps += self.env.num_envs
 
                 # compute total rewards

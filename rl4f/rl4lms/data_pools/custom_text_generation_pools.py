@@ -22,13 +22,11 @@ class Morality(TextGenPool):
         prompt_prefix: str = "",
         truncate_article: int = None,
         max_size: int = None,
+        folder_path: str = 'morality'
     ):
-        if split == "train":
-            pth = f"projectnb/llamagrp/feyzanb/feedback/data/morality/morality_{split}.jsonl"  # TODO: change file names
-        elif split == "val":
-            pth = "projectnb/llamagrp/feyzanb/feedback/data/morality/morality_train.jsonl"
-        elif split == "test":
-            pth = "projectnb/llamagrp/feyzanb/feedback/data/morality/morality_train.jsonl"
+        # TODO: change file names
+        if split in ["train", "val", "test"]:
+            pth = f"projectnb/llamagrp/feyzanb/feedback/data/{folder_path}/morality_{split}.jsonl"
         else:
             raise ValueError("Split not supported")
 
@@ -45,6 +43,7 @@ class Morality(TextGenPool):
             sample = Sample(
                 id=f"{split}_{ix}",
                 prompt_or_input_text=prompt_prefix + item["scenario"],
+                # prompt_or_input_text=prompt_prefix,
                 references=item["human_score"],
             )
             samples.append(sample)
@@ -111,11 +110,11 @@ class OpenAISumm(TextGenPool):
     ):
         # Read the data
         if split == "train":
-            pth = f"projectnb/llamagrp/feyzanb/feedback/data/openai_summ/topic/train_passage_question_answer_2_{stage}.json"
+            pth = f"./projectnb/llamagrp/feyzanb/feedback/data/morality/morality_train.jsonl"
         elif split == "val":
-            pth = f"projectnb/llamagrp/feyzanb/feedback/data/openai_summ/topic/dev_passage_question_answer_2_{stage}.json"
+            pth = f"./projectnb/llamagrp/feyzanb/feedback/data/morality/morality_train.jsonl"
         elif split == "test":
-            pth = f"projectnb/llamagrp/feyzanb/feedback/data/openai_summ/topic/test_passage_question_answer_2_{stage}.json"
+            pth = f"./projectnb/llamagrp/feyzanb/feedback/data/morality/morality_train.jsonl"
         else:
             raise ValueError("Split not supported")
 
@@ -126,12 +125,12 @@ class OpenAISumm(TextGenPool):
 
         samples = []
         for ix, item in enumerate(data):
-            if type(item["summary"]) != list:
-                item["summary"] = [item["summary"]]
+            if type(item["human_score"]) != list:
+                item["human_score"] = [item["human_score"]]
             sample = Sample(
                 id=f"{split}_{ix}",
-                prompt_or_input_text=prompt_prefix + item["text"],
-                references=item["summary"],
+                prompt_or_input_text=prompt_prefix + item["scenario"],
+                references=item["human_score"],
             )
             samples.append(sample)
 

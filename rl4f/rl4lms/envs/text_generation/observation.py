@@ -129,7 +129,8 @@ class Observation:
         # override truncation side for prompt
         prev_truncation_side = tokenizer.truncation_side
         tokenizer.truncation_side = prompt_truncation_side
-        prompt_outputs = tokenizer(sample.prompt_or_input_text,
+        # prompt_outputs = tokenizer(sample.prompt_or_input_text,
+        prompt_outputs = tokenizer("Generate schema for evaluating morality: ",
                                    padding="max_length",
                                    max_length=max_input_length,
                                    return_tensors="pt",

@@ -1,0 +1,15 @@
+2024-05-09 05:56:11,640 [INFO] Split val predictions
+2024-05-09 05:56:11,648 [INFO] {'sample_id': '1', 'prompt_text': 'Hello', 'gen_text': 'I am there'}
+2024-05-09 05:56:11,651 [INFO] {'sample_id': '2', 'prompt_text': 'Hi', 'gen_text': 'there'}
+2024-05-09 05:56:11,657 [INFO] val metrics: {'epoch': 1, 'metrics': {'metric_1': 0.05, 'metric_2': 0.1}}
+2024-05-09 05:56:11,664 [INFO] Split val predictions
+2024-05-09 05:56:11,666 [INFO] {'sample_id': '2', 'prompt_text': 'Hi', 'gen_text': 'there'}
+2024-05-09 05:56:11,670 [INFO] {'sample_id': '1', 'prompt_text': 'Hello', 'gen_text': 'I am there'}
+2024-05-09 05:56:11,675 [INFO] val metrics: {'epoch': 2, 'metrics': {'metric_1': 0.06, 'metric_2': 0.2}}
+2024-05-09 05:56:11,681 [INFO] Split val predictions
+2024-05-09 05:56:11,683 [INFO] {'sample_id': '1', 'prompt_text': 'Hello', 'gen_text': 'I am there'}
+2024-05-09 05:56:11,685 [INFO] {'sample_id': '2', 'prompt_text': 'Hi', 'gen_text': 'there'}
+2024-05-09 05:56:11,688 [INFO] val metrics: {'epoch': 3, 'metrics': {'metric_1': 0.06, 'metric_2': 0.3}}
+2024-05-09 05:56:11,690 [INFO] Rollout Info: {'ep_len': 2, 'ep_reward': 0.4}
+2024-05-09 05:56:11,696 [INFO] Rollout Info: {'ep_len': 3, 'ep_reward': 0.5}
+2024-05-09 05:56:11,699 [INFO] Rollout Info: {'ep_len': 3, 'ep_reward': 0.5}

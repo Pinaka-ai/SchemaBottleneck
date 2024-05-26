@@ -10,6 +10,7 @@ from rl4lms.envs.text_generation.reward import BatchedRewardFunction, RewardFunc
 from rl4lms.envs.text_generation.observation import Observation
 from transformers import AutoTokenizer
 from rl4lms.core_components.sampler import PrioritySampler
+from custom_reward import EditMatch
 from myutil import ForkedPdb
 
 class TextGenEnv(Env):
@@ -108,6 +109,9 @@ class TextGenEnv(Env):
             "prev_output": previous_obs.context_text
         }
 
+        # print('inside env\n')
+        # print(self.__current_obs.to_dict(), reward, done, info)
+
         return self.__current_obs.to_dict(), reward, done, info
 
     def reset(self, sample: Sample = None) -> Dict[str, torch.tensor]:
@@ -116,7 +120,14 @@ class TextGenEnv(Env):
         """
         # gets a new sample if not provided
         if sample is None:
-            sample = self.sampler_for_replaying.sample(size=1)[0]
+            if isinstance(self.reward_function, EditMatch):
+                samples = self.sampler_for_replaying.sample(size=5)
+                combined_sample = Sample(id=samples[0].id, prompt_or_input_text='', references='')
+                combined_sample.prompt_or_input_text += '###'.join([sample.prompt_or_input_text for sample in samples])
+                combined_sample.references += '###'.join([str(sample.references) for sample in samples])
+                sample = combined_sample
+            else:
+                sample = self.sampler_for_replaying.sample(size=1)[0]
         self.__current_sample = sample
 
         # init the observation

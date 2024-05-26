@@ -1,4 +1,14 @@
 __pycache__
 *.pyc
 **.DS_Store
-
+request_gpu_debanjan.sh
+sbatch_logs
+.vscode
+sb
+morality_checkpoints*
+t5_large
+wandb
+trainer_schema_gen
+openai_summ_output
+*.egg-info
+projectnb

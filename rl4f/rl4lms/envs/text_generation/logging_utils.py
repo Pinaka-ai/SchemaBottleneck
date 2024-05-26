@@ -30,6 +30,9 @@ class Tracker:
 
     def _init(self):
         # create a folder
+        print(self._base_path_to_store_results)
+        print(self._project_name)
+        print(self._experiment_name)
         self._run_path = os.path.join(
             self._base_path_to_store_results,
             self._project_name,
@@ -157,7 +160,7 @@ class Tracker:
 
 
 if __name__ == "__main__":
-    base_path = "/scratch/test_logs"
+    base_path = "./test_logs"
     run_config = {
         "param_1": 1,
         "param_2": 2
@@ -183,7 +186,8 @@ if __name__ == "__main__":
         {"ep_len": 3, "ep_reward": 0.5},
     ]
 
-    tracker = Tracker(base_path, run_config, "Test run", True)
+    # tracker = Tracker(base_path, run_config, "Test run", True) # commented by parth to test this tracker
+    tracker = Tracker(base_path, run_config, "Test run", "exp1")
     tracker.log_predictions(1, "val", predictions["1"])
     tracker.log_metrics(1, "val", metrics["1"])
     tracker.log_predictions(2, "val", predictions["2"])

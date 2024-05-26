@@ -4,7 +4,7 @@ from typing import Dict, List
 import pdb, sys
 import openai
 from tqdm import tqdm
-
+from openai import OpenAI
 
 def levenshtein(s1, s2):
     if len(s1) > len(s2):
@@ -131,41 +131,63 @@ def get_generations_gpt3(
     n: int,
     keyfile: str,
     top_p: float = 1.0,
+    generate_json: bool = False,
+    final_morality: bool = False
 ) -> List[str]:
 
-    openai.api_key = [el for el in open(keyfile, "r")][0][:-1]
+
+    client = OpenAI(api_key=keyfile)
     gens = []
     chunks_ls = list(chunks(ls, batch_size))
     for chunk in tqdm(chunks_ls, total=len(chunks_ls)):
         # create a completion
         lst = [el.rstrip(" ") for el in chunk]
         success = False
-        retries = 1
-        while not success and retries < 200:
+        retries = -2
+        while not success and retries < 1:
             try:
-                completion = openai.Completion.create(
-                    engine=model_name,
-                    prompt=lst,
-                    max_tokens=max_length,
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "user", "content": f"{lst}"},
+                    ],
                     temperature=temperature,
-                    n=n,
-                    top_p=top_p,
-                    stop=stop,
-                    frequency_penalty=penalty,
+                    max_tokens=max_length
                 )
+                completion = response.choices[0].message.content.strip()
+                # print(completion.choices[0].message)
+
                 success = True
+
+                if generate_json:
+                    try:
+                        obj = json.loads(completion)
+                    except:
+                        success = False
+                
+                if final_morality:
+                    try:
+                        score = json.loads(completion)["morality_score"]
+
+                        if float(score) < -4.0 or float(score) > 4.0:
+                            success = False
+                    except:
+                        success = False
+                        
+                        
             except Exception as e:
                 wait = retries * 10
-                print(f'Error, rate limit reached! Waiting {str(wait)} secs and re-trying...')
+                print(f'Error, rate limit reached! Waiting {str(wait)} secs and re-trying...', e)
                 sys.stdout.flush()
                 time.sleep(wait)
                 retries += 1
 
-        # Process the completions
-        comps = [c.text for c in completion.choices]
-        if clean_tok:
-            comps = [clean_up_tokenization(c) for c in comps]
-        gens.extend(comps)
+        if not success:
+            completion = {
+                "morality_score": "0"
+            }
+        print("*******", completion)
+        gens.extend([completion])
 
     gens = [gen.replace("\xa0", " ").strip() for gen in gens]
     return gens

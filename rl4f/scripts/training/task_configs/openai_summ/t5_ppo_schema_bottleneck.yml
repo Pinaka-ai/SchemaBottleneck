@@ -9,10 +9,10 @@ reward_fn:
   id: editmatch
   args:
     metric:
-      prompt_path: "./data/openai_summ/topic/prompts_edit_instructional_novo.txt"
+      prompt_path: "./data/morality_change_this/prompt_new.txt"
       separator: "\n\n---\n\n"
-      downstream_metric_name: rouge_combined
-      openai_key: openai_key
+      downstream_metric_name: mse
+      openai_key: "..."
       gpt3_model_name: code-davinci-002
       cache_path: "./openai_summ_output/cache_me.json"
       save_path: ""
@@ -24,16 +24,16 @@ reward_fn:
       pad_token_as_eos_token: False
   
 datapool:
-  id: openai_summ
+  id: morality
   args:
-    prompt_prefix: "critique: "
+    prompt_prefix: "Generate a schema to evaluate morality:"
     stage: ppo
-
+    folder_path: "morality_combined_gpt_caliberated"
 
 env:
-  n_envs: 10
+  n_envs: 2
   args:
-    max_prompt_length: 1024
+    max_prompt_length: 30
     max_episode_length: 180
     terminate_on_eos: True
     prompt_truncation_side: "right"
@@ -42,8 +42,8 @@ env:
 alg:
   id: ppo
   args: 
-    n_steps: 1024
-    batch_size: 2
+    n_steps: 512
+    batch_size: 16
     verbose: 0
     learning_rate: 0.000001
     n_epochs: 3
@@ -54,7 +54,7 @@ alg:
   policy:
     id: seq2seq_lm_actor_critic_policy
     args:
-      model_name: ./openai_summ_output/openai_summ_sup/t5large_lr1e6/model # ./data/trained_models_ai2/t5large_openai_summ_QMQ3V
+      model_name: ../trainer_schema_gen/checkpoint
       apply_model_parallel: True
       prompt_truncation_side: "right"
       optimizer_kwargs:
@@ -64,50 +64,39 @@ alg:
         top_k: 0
         temperature: 0.7
         min_length: 20
-        max_new_tokens: 150
+        max_new_tokens: 30
     
 train_evaluation:
-  eval_batch_size: 6
+  eval_batch_size: 16
   seed: 0
-  n_iters: 100
-  eval_every: 3
-  save_every: 3
+  n_iters: 18
+  eval_every: 1
+  save_every: 1
   metrics:
-    # - id: meteor
-    #   args: {}
-    # - id: rouge
-    # - id: bleu
-    #   args: {}
     - id: editmatch
       args: 
-        prompt_path: "./data/openai_summ/topic/prompts_edit_instructional_novo.txt"
+        prompt_path: "./data/morality_change_this/prompt_new.txt"
         separator: "\n\n---\n\n"
-        downstream_metric_name: rouge_combined
-        openai_key: openai_key
+        downstream_metric_name: mse
+        openai_key: "..."
         gpt3_model_name: code-davinci-002
         cache_path: "./openai_summ_output/cache_me.json"
         save_path: ""
         append_feedback_to_q: True
         lambda_rouge_input: 4
-    # - id: bert_score
-    #   args:
-    #     language: en
-    # - id: bleurt
-    #   args:
-    #     config_name: bleurt-large-512
-    - id: diversity
-      args: {}
-    # - id: summaCZS
-    #   args:
-    #     granularity: sentence
-    #     use_ent: True
-    #     use_con: False
-    # - id: summaCConv
-    #   args:
-    #     granularity: sentence
   generation_kwargs:
-    do_sample: True
-    temperature: 0.7
+    do_sample: False
+    temperature: 0.0
     min_length: 20
     max_new_tokens: 150
 
+
+
+
+#  96 scenarios
+# 16 enviroments
+#  num_steps = 120
+# n_iters = 3
+# no of iterations= 3 * 16 * (100 / 10) = 480
+#  16 * 120 = 1920
+#  1920 / 64 = 30
