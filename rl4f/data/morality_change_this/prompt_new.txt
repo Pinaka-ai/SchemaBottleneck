@@ -1,21 +1,30 @@
-You are given a scenario and a schema containing a set of virtues that assess its morality.
+You are given a scenario and a schema containing a set of aspects to assess its morality.
 
 Task:
-For each virtue, choose an integer score from the set [-4, -3, -2, -1, 0, 1, 2, 3, 4].
 
-Rules for Assigning Morality Scores:
+For each aspect, assign an integer score from the set [-4, -3, -2, -1, 0, 1, 2, 3, 4].
 
-Positive Scores [1 to 4]: The scenario exhibits moral behavior for the given virtue.
-Negative Scores [-4 to -1]: The scenario exhibits immoral behavior for the given virtue.
-Neutral Score [0]: The scenario shows morally neutral characteristics for the given virtue.
+Positive Scores [1 to 4]: The aspect was positively evaluated (e.g., 1 = low positive evaluation, 4 = high positive evaluation).
+Negative Scores [-4 to -1]: The aspect was negatively evaluated (e.g., -1 = low negative evaluation, -4 = high negative evaluation).
+Neutral Score [0]: The scenario is neutral for this aspect.
 
-Provide scores in strict JSON format with each question as the key and an integer score as the value.
+Provide the scores in strict JSON format with each aspect as the key and the assigned integer score as the value. Ensure the keys correspond to the actual schema aspects provided and do not start with "aspect."
 
+Example Schema:
 {
-    "virtue": "Pick a score in range [-4, 4]",
-    .
-    .
-    .
+"aspect1": "... an integer score from -4 to 4",
+"aspect2": "... an integer score from -4 to 4",
+...
 }
 
-Make sure the keys do not start with "virtue", the keys should be actual schema virtue given.
+Example Response:
+{
+"aspect1": 2,
+"aspect2": -3,
+...
+}
+
+
+# Cacge
+
+(aspect_name, scenario) ->  score

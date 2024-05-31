@@ -13,7 +13,7 @@ import os, re, string
 import ipdb
 import csv
 import numpy as np
-
+from cache import AspectCacheKey, AspectCacheValue, AspectCache
 
 CALLS = 0
 ATTEMPTS = 0
@@ -44,6 +44,9 @@ class EditMatchMetric(BaseMetric):
         self.save_path = kwargs["save_path"]
         self.append_feedback_to_q = kwargs.get("append_feedback_to_q", False)
         self.lambda_rouge_input = kwargs.get("lambda_rouge_input", 0.3)
+        self.aspect_cache = AspectCache(cache_file='cache.jsonl', save_every=5)
+
+
 
         assert self.downstream_metric_name in [
             "rouge_combined",
@@ -94,22 +97,41 @@ class EditMatchMetric(BaseMetric):
         if self.append_feedback_to_q:
             # Prepend prompt.
             input_wfeed = []
+            cached_wfeed = []
             for input_text, feedback_pred in zip(inputs, generated_texts):
                 # Get text between "Question: " and "\n\nAnswer:"
-                it = input_text
-                it = it.replace("\n", " ")
+                # it = input_text
+                # it = it.replace("\n", " ")
                 # question = re.search("Question: (.*)Answer:", it).group(1).strip()
-                input_wfeed.append(
-                    (
-                        self.prompt
-                        + self.separator
-                        + "Scenario: "
-                        + input_text
-                        + "\nSchema: \n"
-                        + feedback_pred
-                        + "\n"
+
+                aspects = [aspect.strip() for aspect in feedback_pred.split(',')]
+                
+                uncached_aspects = {}
+                cached_aspects = {}
+                for i, aspect in enumerate(aspects):
+                    cache_key = AspectCacheKey(scenario=input_text, aspect=aspect)
+                    cache_val = self.aspect_cache.get(cache_key)
+                    if cache_val:
+                        cached_aspects[i] = (aspect, cache_val.response)
+                    else:
+                        uncached_aspects[i] = (aspect, None)
+                feedback_pred = ', '.join(map(lambda x: x[0], list(uncached_aspects.values())))
+
+                cached_wfeed.append(cached_aspects)
+                if feedback_pred:
+                    input_wfeed.append(
+                        (
+                            self.prompt
+                            + self.separator
+                            + "Scenario: "
+                            + input_text
+                            + "\nSchema: \n"
+                            + feedback_pred
+                            + "\n"
+                        )
                     )
-                )
+                else:
+                    input_wfeed.append(None)
         else:
             # Prepend prompt.
             input_wfeed = [
@@ -127,36 +149,46 @@ class EditMatchMetric(BaseMetric):
         # print("\n\nThis is input feed", input_wfeed)
         # print("-----------------\n\n")
 
-        if self.cache_path != "":
+        # if self.cache_path != "":
             
-            try:
-                self.GPT3_CACHE
-            except:
-                # If GPT3_CACHE is empty, load it from cache_path.
-                if os.path.exists(self.cache_path):
-                    with open(self.cache_path, "r") as f:
-                        self.GPT3_CACHE = json.load(f)
-                else:
-                    self.GPT3_CACHE = {}
+        #     try:
+        #         self.GPT3_CACHE
+        #     except:
+        #         # If GPT3_CACHE is empty, load it from cache_path.
+        #         if os.path.exists(self.cache_path):
+        #             with open(self.cache_path, "r") as f:
+        #                 self.GPT3_CACHE = json.load(f)
+        #         else:
+        #             self.GPT3_CACHE = {}
 
-            # Check if we have cached results.
-            cache_queries = [el for el in input_wfeed]
+        #     # Check if we have cached results.
+        #     cache_queries = [el for el in input_wfeed]
 
-            cached_results = []
-            uncached_inputs = []
-            for i, input in enumerate(cache_queries):
-                ATTEMPTS += 1
-                if input in self.GPT3_CACHE:
-                    HITS += 1
-                    cached_results.append((i, self.GPT3_CACHE[input]))
-                else:
-                    uncached_inputs.append((i, input_wfeed[i]))
-            input_wfeed = [x[1] for x in uncached_inputs]
+        #     cached_results = []
+        #     uncached_inputs = []
+        #     for i, input in enumerate(cache_queries):
+        #         ATTEMPTS += 1
+        #         if input in self.GPT3_CACHE:
+        #             HITS += 1
+        #             cached_results.append((i, self.GPT3_CACHE[input]))
+        #         else:
+        #             uncached_inputs.append((i, input_wfeed[i]))
+        #     input_wfeed = [x[1] for x in uncached_inputs]
 
         # Query GPT-3
 
+        gpt_inputs = []
+
+        for inp in input_wfeed:
+            if inp:
+                # then we have to me a call
+                gpt_inputs.append((inp, True))
+            else:
+                # then it has been cached
+                gpt_inputs.append((cached_wfeed, False))
+
         gpt_call_1 = get_generations_gpt3(
-            ls=input_wfeed,
+            ls=gpt_inputs,
             model_name=self.model_name,
             clean_tok=True,
             stop=[self.separator, "Edit:", "Feedback:", "Question:"],
@@ -168,28 +200,50 @@ class EditMatchMetric(BaseMetric):
             keyfile=self.openai_api_key,
             generate_json=True
         )
+        
+        # merge cached and uncaches results
+        merged_results = []
+        for scenario, uncached_scores, cached_scores in zip(inputs, gpt_call_1, cached_wfeed):
 
-        # print("\nThis is the intermediate step of ", gpt_call_1)
-        # print("-----------------\n\n")
+            # 
+            merged_aspect_scores = {}
+            num_aspects = len(uncached_scores) + len(cached_scores)
 
+            uncached_aspect_counter = 0
+            uncached_aspect_keys = list(uncached_scores.keys())
+            for i in range(num_aspects):
+                cached_res = cached_scores.get(i, None)
+                if cached_res:
+                    merged_aspect_scores[cached_res[0]] = cached_res[1]
+
+                else:
+                    uncached_aspect = uncached_aspect_keys[uncached_aspect_counter]
+                    merged_aspect_scores[uncached_aspect] = uncached_scores[uncached_aspect]
+                    uncached_aspect_counter += 1
+                    cache_key = AspectCacheKey(scenario=scenario, aspect=uncached_aspect)
+                    cache_val = AspectCacheValue(response=uncached_scores[uncached_aspect])
+                    self.aspect_cache.set(cache_key, cache_val)
+            merged_results.append(merged_aspect_scores)
+
+            
 
         message = """
-            You are given a set of virtues that assess the morality of a scenario. Each virtue has been assigned a score in the range of -4 to 4, reflecting the extent to which the associated moral virtue was impacted.
-
+            You are given a set of aspects and a score for each aspect that tells how the aspect was evaluated for some situation. 
+             
             Score Interpretation:
 
-            Negative Scores [-4 to -1]: The virtue was negatively impacted, resulting in a negative moral evaluation.
-            Neutral Score [0]: The virtue was not significantly impacted.
-            Positive Scores [1 to 4]: The virtue was positively impacted, resulting in a positive moral evaluation.
+            Positive Scores [1 to 4]: The aspect was positively evaluated (e.g., 1 = low positive evaluation, 4 = high positive evaluation).
+            Negative Scores [-4 to -1]: The aspect was negatively evaluated (e.g., -1 = low negative evaluation, -4 = high negative evaluation).
+            Neutral Score [0]: The scenario is neutral for this aspect.
             
-            Virtues:
+            Aspects:
 
             {{virtue set}}
 
             Task:
 
-            Carefully analyze the individual scores of each virtue and choose the final morality score based on the virtues from the set [-4, -3, -2, -1, 0, 1, 2, 3, 4]
-            with -4 being highly immoral and 4 being highly moral.
+            Carefully analyze the individual scores of each aspect and choose the final morality score
+            based on the aspects from the set [-4, -3, -2, -1, 0, 1, 2, 3, 4] with -4 being highly immoral and 4 being highly moral.
 
             Note: The morality score should be strictly an integer in the range -4 to 4.
 
@@ -203,15 +257,18 @@ class EditMatchMetric(BaseMetric):
 
         all_messages = []
 
-        for obj in gpt_call_1:
+        for obj in merged_results:
             arr = []
-            for k, v in json.loads(obj).items():
+            for k, v in obj.items():
                 arr.append(f'{k}: {v}')
             
             final_str = "\n".join(arr)
             new_message = message.replace("{{virtue set}}", final_str)
 
-            all_messages.append(new_message)
+            all_messages.append((new_message, True))
+
+        # here, we need to merge
+
 
         final_preds = get_generations_gpt3(
             ls=all_messages,
@@ -228,38 +285,38 @@ class EditMatchMetric(BaseMetric):
             final_morality=True
         )
 
-        # print("\n\nThis is the final GPT output, ", final_preds)
+        print("\n\nThis is the final GPT output, ", final_preds)
 
         edit_pred = []
         for obj in final_preds:
             try:
-                edit_pred.append(str(json.loads(obj)["morality_score"]))
+                edit_pred.append(str(obj["morality_score"]))
             except:
                 edit_pred.append(str(0))
 
-        # print("\n\n This is the edit pred", edit_pred)
+        print("\n\n This is the edit pred", edit_pred)
 
-        if self.cache_path != "":
-            # Update cache.
-            uncached_queries = [cache_queries[i] for i, _ in uncached_inputs]
-            self.GPT3_CACHE.update(dict(zip(uncached_queries, edit_pred)))
+        # if self.cache_path != "":
+        #     # Update cache.
+        #     uncached_queries = [cache_queries[i] for i, _ in uncached_inputs]
+        #     self.GPT3_CACHE.update(dict(zip(uncached_queries, edit_pred)))
 
-            if CALLS % 100 == 0:
-                print("Size: ", len(self.GPT3_CACHE), "Attempts: ", ATTEMPTS, "Hits: ", HITS, "Ratio: ", HITS / ATTEMPTS)
-                print("Saving cache to", self.cache_path)
-                with open(self.cache_path, "w") as f:
-                    json.dump(self.GPT3_CACHE, f)
-            CALLS += 1
+        #     if CALLS % 100 == 0:
+        #         print("Size: ", len(self.GPT3_CACHE), "Attempts: ", ATTEMPTS, "Hits: ", HITS, "Ratio: ", HITS / ATTEMPTS)
+        #         print("Saving cache to", self.cache_path)
+        #         with open(self.cache_path, "w") as f:
+        #             json.dump(self.GPT3_CACHE, f)
+        #     CALLS += 1
 
-            edit_pred = iter(edit_pred)
-            uncached_results = [(i, next(edit_pred)) for i, _ in uncached_inputs]
+        #     edit_pred = iter(edit_pred)
+        #     uncached_results = [(i, next(edit_pred)) for i, _ in uncached_inputs]
 
-            # Combine cached and uncached results.
-            results = cached_results + uncached_results
+        #     # Combine cached and uncached results.
+        #     results = cached_results + uncached_results
 
-            # Sort results by index.
-            results.sort(key=lambda x: x[0])
-            edit_pred = [v for _, v in results]
+        #     # Sort results by index.
+        #     results.sort(key=lambda x: x[0])
+        #     edit_pred = [v for _, v in results]
 
         # If len(prompt_texts) = 1, then print.
         if len(edit_pred) <= 2:

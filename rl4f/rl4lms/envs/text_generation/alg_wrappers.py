@@ -112,7 +112,9 @@ def wrap_onpolicy_alg(alg_class: Type[OnPolicyAlgorithm],
             obs_tensor = obs_as_tensor(current_obs, self.device)
             input_ids, attention_masks = self.policy.get_inputs_for_generation(
                 obs_tensor)
-            gen_output = self.policy.generate(input_ids=input_ids,
+
+
+            gen_output = self.policy.generate(input_ids=input_ids, # num_envs x num_tokens
                                               attention_mask=attention_masks,
                                               tokenizer=tokenizer,
                                               )
@@ -130,7 +132,7 @@ def wrap_onpolicy_alg(alg_class: Type[OnPolicyAlgorithm],
             for actions_tensor, log_probs, action_mask in zip(gen_output["step_wise_actions"],
                                                               gen_output["step_wise_logprobs"],
                                                               masks):
-
+                #  actions_tensor num_envs x 1
                 # sanity check
                 assert torch.all(torch.isfinite(log_probs)
                                  ), "Infinite values in log probs"
@@ -180,7 +182,7 @@ def wrap_onpolicy_alg(alg_class: Type[OnPolicyAlgorithm],
                     kl_rewards = -1 * self._kl_controller.kl_coeff * kl_div
 
                 # step into env to get rewards
-                actions = actions_tensor.cpu().numpy()
+                actions = actions_tensor.cpu().numpy()  # num_envs x 1
                 new_obs, rewards, dones, infos = self.env.step(actions)
 
                

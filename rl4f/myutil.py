@@ -120,7 +120,7 @@ def chunks(ls, n):
 
 
 def get_generations_gpt3(
-    ls: List[str],
+    ls: List[tuple],
     model_name: str,
     clean_tok: bool,
     stop: List[str],
@@ -141,55 +141,70 @@ def get_generations_gpt3(
     chunks_ls = list(chunks(ls, batch_size))
     for chunk in tqdm(chunks_ls, total=len(chunks_ls)):
         # create a completion
-        lst = [el.rstrip(" ") for el in chunk]
-        success = False
-        retries = -2
-        while not success and retries < 1:
-            try:
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "user", "content": f"{lst}"},
-                    ],
-                    temperature=temperature,
-                    max_tokens=max_length
-                )
-                completion = response.choices[0].message.content.strip()
-                # print(completion.choices[0].message)
+        lsts, flags = zip(*chunk)
+        lsts = [x.rstrip(" ") for x in lsts]
 
-                success = True
-
-                if generate_json:
+        completions = []
+        for i in range(len(flags)):
+            should_call = flags[i]
+            if should_call:
+                success = False
+                retries = 0
+                while not success and retries < 1:
                     try:
-                        obj = json.loads(completion)
-                    except:
-                        success = False
-                
-                if final_morality:
-                    try:
-                        score = json.loads(completion)["morality_score"]
+                        response = client.chat.completions.create(
+                            model="gpt-3.5-turbo",
+                            messages=[
+                                {"role": "user", "content": f"{lsts[i]}"},
+                            ],
+                            temperature=temperature,
+                            max_tokens=max_length
+                        )
+                        completion = response.choices[0].message.content.strip()
 
-                        if float(score) < -4.0 or float(score) > 4.0:
-                            success = False
-                    except:
-                        success = False
+                        success = True
+
+                        if generate_json:
+                            try:
+                                completion = json.loads(completion)
+                            except:
+                                success = False
                         
-                        
-            except Exception as e:
-                wait = retries * 10
-                print(f'Error, rate limit reached! Waiting {str(wait)} secs and re-trying...', e)
-                sys.stdout.flush()
-                time.sleep(wait)
-                retries += 1
+                        if final_morality:
+                            print("\n\ncompletion", completion)
+                            try:
+                                score = float(completion["morality_score"])
 
-        if not success:
-            completion = {
-                "morality_score": "0"
-            }
-        print("*******", completion)
-        gens.extend([completion])
+                                if float(score) < -4.0 or float(score) > 4.0:
+                                    success = False
+                            except:
+                                success = False
+                                retries += 1
+                    except Exception as e:
+                        wait = retries * 10
+                        print(f'Error, rate limit reached! Waiting {str(wait)} secs and re-trying...', e)
+                        sys.stdout.flush()
+                        time.sleep(wait)
+                        retries += 1
 
-    gens = [gen.replace("\xa0", " ").strip() for gen in gens]
+                if not success:
+                    if final_morality:
+                        completion = {
+                            "morality_score": "0"
+                        }
+                    else:
+                        # generate aspects
+                        completion = {key: 0 for key in lsts[i].split(", ")}
+
+            else:
+                completion = {}
+
+            completions.append(completion)
+        # print("*******", completion)
+        gens.extend(completions)
+
+
+    # gens = [gen.replace("\xa0", " ").strip() for gen in gens]
     return gens
 
 
