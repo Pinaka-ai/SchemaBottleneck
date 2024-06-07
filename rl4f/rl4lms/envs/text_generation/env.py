@@ -22,7 +22,9 @@ class TextGenEnv(Env):
                  max_prompt_length: Optional[int] = None,
                  terminate_on_eos: bool = False,
                  context_start_token: Optional[int] = None,
-                 prompt_truncation_side: str = "left"):
+                 prompt_truncation_side: str = "left",
+                 obs_prompt: str = ""
+                 ):
         """
         A generic RL environment to generate textual sequences.
         For eg: text generation, summarization, machine translation, text simplification
@@ -44,6 +46,7 @@ class TextGenEnv(Env):
         self._terminate_on_eos = terminate_on_eos
         self._context_start_token = context_start_token
         self._prompt_truncation_side = prompt_truncation_side
+        self.obs_prompt = obs_prompt
         super().__init__()
 
         # set the observation and action space here
@@ -121,7 +124,7 @@ class TextGenEnv(Env):
         # gets a new sample if not provided
         if sample is None:
             if isinstance(self.reward_function, EditMatch):
-                samples = self.sampler_for_replaying.sample(size=5)
+                samples = self.sampler_for_replaying.sample(size=10)
                 combined_sample = Sample(id=samples[0].id, prompt_or_input_text='', references='')
                 combined_sample.prompt_or_input_text += '###'.join([sample.prompt_or_input_text for sample in samples])
                 combined_sample.references += '###'.join([str(sample.references) for sample in samples])
@@ -137,7 +140,8 @@ class TextGenEnv(Env):
                                                           self.max_steps,
                                                           self._prompt_truncation_side,
                                                           self._context_start_token,
-                                                          sample.meta_data)
+                                                          sample.meta_data,
+                                                          self.obs_prompt)
 
         # start the time step counter
         self.__time_step = 0

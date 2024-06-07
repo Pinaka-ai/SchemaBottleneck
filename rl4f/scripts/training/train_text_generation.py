@@ -12,6 +12,9 @@ import torch
 import numpy as np
 import random
 
+import gc
+torch.cuda.empty_cache()
+gc.collect()
 
 def main(
     config_path: str,
@@ -69,6 +72,7 @@ def main(
             on_policy_alg_config=config["alg"],
             train_eval_config=config["train_evaluation"],
             tracker=tracker,
+            prompt=config["obs_prompt"]
         )
     trainer.train_and_eval()
 

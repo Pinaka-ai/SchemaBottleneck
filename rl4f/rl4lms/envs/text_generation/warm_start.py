@@ -4,6 +4,7 @@ from rl4lms.envs.text_generation.logging_utils import Tracker
 import os
 import torch
 from myutil import ForkedPdb
+from datetime import datetime
 ################## Policy Warm Start Mixins#######################################
 
 
@@ -146,7 +147,10 @@ class TrainerWarmStartMixin:
             "policy_state": policy.get_state_dict(),
             "trainer_state": trainer_state
         }
-        _, recent_ckpt_id = self._get_recent_ckpt_path(tracker)
+
+        recent_ckpt_id = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        # _, recent_ckpt_id = self._get_recent_ckpt_path(tracker)
+        # define our own 
 
         # hot fix - just to save only the last checkpoint (overwrite)
         new_ckpt_id = 0 if recent_ckpt_id is None else recent_ckpt_id

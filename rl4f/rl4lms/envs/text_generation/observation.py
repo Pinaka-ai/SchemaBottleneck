@@ -124,13 +124,15 @@ class Observation:
                          max_context_length: int,
                          prompt_truncation_side: str,
                          context_start_token: int = None,
-                         meta_info: Dict[str, Any] = None):
+                         meta_info: Dict[str, Any] = None,
+                         obs_prompt: str = ""
+                         ):
         # encode the prompt text
         # override truncation side for prompt
         prev_truncation_side = tokenizer.truncation_side
         tokenizer.truncation_side = prompt_truncation_side
         # prompt_outputs = tokenizer(sample.prompt_or_input_text,
-        prompt_outputs = tokenizer("Generate schema for evaluating morality: ",
+        prompt_outputs = tokenizer(obs_prompt,
                                    padding="max_length",
                                    max_length=max_input_length,
                                    return_tensors="pt",

@@ -203,6 +203,7 @@ class PPO(OnPolicyAlgorithm):
         entropy_losses = []
         pg_losses, value_losses = [], []
         clip_fractions = []
+        losses = []
 
         continue_training = True
 
@@ -214,6 +215,7 @@ class PPO(OnPolicyAlgorithm):
 
                 # print('PPO training '*5, batch_ix, rollout_data)
                 # self.verify_rollout_data(rollout_data)
+
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
                     # Convert discrete action from float to long
@@ -226,6 +228,7 @@ class PPO(OnPolicyAlgorithm):
                 values, log_prob, entropy = self.policy.evaluate_actions(
                     rollout_data.observations, actions)
                 values = values.flatten()
+
                 # Normalize advantage
                 advantages = rollout_data.advantages
                 if self.normalize_advantage:
@@ -234,6 +237,7 @@ class PPO(OnPolicyAlgorithm):
 
                 # ratio between old and new policy, should be one at the first iteration
                 ratio = th.exp(log_prob - rollout_data.old_log_prob)
+
                 # if batch_ix == 0 and epoch == 0:
                 #     assert th.allclose(th.mean(ratio), th.tensor(
                 #         1.0)), f"Ratio is {th.mean(ratio)}"
@@ -244,11 +248,13 @@ class PPO(OnPolicyAlgorithm):
                     th.clamp(ratio, 1 - clip_range, 1 + clip_range)
                 policy_loss = -th.min(policy_loss_1, policy_loss_2).mean()
 
+
                 # Logging
                 pg_losses.append(policy_loss.item())
                 clip_fraction = th.mean(
                     (th.abs(ratio - 1) > clip_range).float()).item()
                 clip_fractions.append(clip_fraction)
+                
 
                 if self.clip_range_vf is None:
                     # No clipping
@@ -263,6 +269,7 @@ class PPO(OnPolicyAlgorithm):
                 value_loss = F.mse_loss(rollout_data.returns, values_pred)
                 value_losses.append(value_loss.item())
 
+
                 # Entropy loss favor exploration
                 if entropy is None:
                     # Approximate entropy when no analytical form
@@ -270,9 +277,11 @@ class PPO(OnPolicyAlgorithm):
                 else:
                     entropy_loss = -th.mean(entropy)
 
+
                 entropy_losses.append(entropy_loss.item())
 
                 loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+                losses.append(loss.detach().item())
 
                 # Calculate approximate form of reverse KL Divergence for early stopping
                 # see issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
@@ -294,10 +303,12 @@ class PPO(OnPolicyAlgorithm):
                 # Optimization step
                 self.policy.optimizer.zero_grad()
                 loss.backward()
+
                 # Clip grad norm
                 th.nn.utils.clip_grad_norm_(
                     self.policy.parameters(), self.max_grad_norm)
                 self.policy.optimizer.step()
+
 
             if not continue_training:
                 break
@@ -312,7 +323,7 @@ class PPO(OnPolicyAlgorithm):
         self.logger.record("train/value_loss", np.mean(value_losses))
         self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
         self.logger.record("train/clip_fraction", np.mean(clip_fractions))
-        self.logger.record("train/loss", loss.item())
+        self.logger.record("train/total_loss", np.mean(losses))
         self.logger.record("train/explained_variance", explained_var)
         if hasattr(self.policy, "log_std"):
             self.logger.record(

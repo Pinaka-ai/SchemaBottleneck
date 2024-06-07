@@ -6,6 +6,8 @@ import openai
 from tqdm import tqdm
 from openai import OpenAI
 
+key_index = 0
+
 def levenshtein(s1, s2):
     if len(s1) > len(s2):
         s1, s2 = s2, s1
@@ -129,38 +131,47 @@ def get_generations_gpt3(
     max_length: int,
     penalty: float,
     n: int,
-    keyfile: str,
+    keyfile: List[str],
     top_p: float = 1.0,
     generate_json: bool = False,
-    final_morality: bool = False
+    final_morality: bool = False,
+    use_together_ai_api: bool = False
 ) -> List[str]:
+    
+    global key_index
 
+    client = OpenAI(
+        api_key=keyfile[key_index],
+        base_url='https://api.together.xyz/v1' if use_together_ai_api else None
+    )
 
-    client = OpenAI(api_key=keyfile)
     gens = []
     chunks_ls = list(chunks(ls, batch_size))
     for chunk in tqdm(chunks_ls, total=len(chunks_ls)):
         # create a completion
-        lsts, flags = zip(*chunk)
-        lsts = [x.rstrip(" ") for x in lsts]
-
+        # lsts, flags = zip(*chunk)
+        # print("\n\nThis is the chunk", chunk)
+        # lsts = [x.rstrip(" ") for x in lsts]
         completions = []
-        for i in range(len(flags)):
-            should_call = flags[i]
+        for lst, should_call in chunk:
             if should_call:
+                lst = lst.rstrip(" ")
                 success = False
                 retries = 0
-                while not success and retries < 1:
+                while not success and retries < 3:
                     try:
                         response = client.chat.completions.create(
-                            model="gpt-3.5-turbo",
+                            model=model_name,
                             messages=[
-                                {"role": "user", "content": f"{lsts[i]}"},
+                                {"role": "user", "content": f"{lst}"},
                             ],
                             temperature=temperature,
                             max_tokens=max_length
                         )
+
                         completion = response.choices[0].message.content.strip()
+
+                        print("\n\nThis is completion: ", completion)
 
                         success = True
 
@@ -169,9 +180,9 @@ def get_generations_gpt3(
                                 completion = json.loads(completion)
                             except:
                                 success = False
+                                retries += 1
                         
                         if final_morality:
-                            print("\n\ncompletion", completion)
                             try:
                                 score = float(completion["morality_score"])
 
@@ -180,12 +191,24 @@ def get_generations_gpt3(
                             except:
                                 success = False
                                 retries += 1
+                    # except openai.error.RateLimitError as e:
+                    #     wait = retries * 10
+                    #     print(f'Error, rate limit reached! Waiting {str(wait)} secs and re-trying...', e)
+                    #     sys.stdout.flush()
+                    #     time.sleep(wait)
+                    #     retries += 1
+                    #     key_index += 1
+                    #     client = OpenAI(api_key=keyfile[key_index])
                     except Exception as e:
                         wait = retries * 10
-                        print(f'Error, rate limit reached! Waiting {str(wait)} secs and re-trying...', e)
+                        # print(f'Error, rate limit reached! Waiting {str(wait)} secs and re-trying...', e)
+                        print("This is error\n", e)
                         sys.stdout.flush()
                         time.sleep(wait)
                         retries += 1
+                        key_index += 1
+                        client = OpenAI(api_key=keyfile[key_index])
+                    
 
                 if not success:
                     if final_morality:
@@ -194,7 +217,7 @@ def get_generations_gpt3(
                         }
                     else:
                         # generate aspects
-                        completion = {key: 0 for key in lsts[i].split(", ")}
+                        completion = {key: 0 for key in lst.split(", ")}
 
             else:
                 completion = {}

@@ -13,11 +13,17 @@ import os, re, string
 import ipdb
 import csv
 import numpy as np
-from cache import AspectCacheKey, AspectCacheValue, AspectCache
+# from cache import AspectCacheKey, AspectCacheValue, AspectCache
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+import re
 
 CALLS = 0
 ATTEMPTS = 0
 HITS = 0
+
+SIMILARITY_THRESHOLD = 0.6
 
 
 def build_tokenizer(tokenizer_config: Dict[str, Any]):
@@ -39,14 +45,16 @@ class EditMatchMetric(BaseMetric):
         self.prompt = kwargs["prompt_path"]
         self.separator = kwargs["separator"]
         self.openai_api_key = kwargs["openai_key"]
-        self.model_name = kwargs["gpt3_model_name"]
         self.cache_path = kwargs["cache_path"]
         self.save_path = kwargs["save_path"]
         self.append_feedback_to_q = kwargs.get("append_feedback_to_q", False)
         self.lambda_rouge_input = kwargs.get("lambda_rouge_input", 0.3)
-        self.aspect_cache = AspectCache(cache_file='cache.jsonl', save_every=5)
-
-
+        self.diversity_penalty = kwargs.get("diversity_penalty", False)
+        self.model_name = kwargs.get("model_name", "")
+        self.use_together_ai_api = kwargs.get("use_together_ai_api", False)
+        # self.aspect_cache = AspectCache(cache_file='cache.jsonl', save_every=5)
+        if self.diversity_penalty:
+            self.sentence_transformer = SentenceTransformer('paraphrase-MiniLM-L6-v2')
 
         assert self.downstream_metric_name in [
             "rouge_combined",
@@ -66,8 +74,8 @@ class EditMatchMetric(BaseMetric):
             self.prompt = f.read()
 
         # Check key is valid.
-        if self.model_name != "code-davinci-002":
-            raise ValueError("You will be charged by OpenAI for this run.")
+        # if self.model_name != "code-davinci-002":
+        #     raise ValueError("You will be charged by OpenAI for this run.")
 
         # Load cache from cache_path.
         if os.path.exists(self.cache_path):
@@ -79,6 +87,21 @@ class EditMatchMetric(BaseMetric):
             if text.startswith(prefix):
                 return text[len(prefix):]
         return text
+    
+    def get_diversity_penalty(self, aspects):
+        assert self.sentence_transformer is not None, "Sentence Transformer is not loaded"
+        with torch.no_grad():
+            embeddings = self.sentence_transformer.encode(aspects)
+        similarity_matrix = cosine_similarity(embeddings)
+        upper_triangle_indices = np.triu_indices(len(similarity_matrix), k=1)
+        similarity_scores = similarity_matrix[upper_triangle_indices]
+        return (np.maximum(0, similarity_scores - SIMILARITY_THRESHOLD) * 4).sum()
+
+
+    def get_aspects_from_schema(self, schema: str, regex_str : str = r'[.,;]\s*'):
+        print('sentence transformer device', self.sentence_transformer.device)
+        result = re.split(regex_str, schema)
+        return result
 
     def compute(
         self,
@@ -91,31 +114,35 @@ class EditMatchMetric(BaseMetric):
         epoch: int = None,
     ):
         global CALLS, ATTEMPTS, HITS
-
         # Strip off task prefix
         inputs = [self.remove_prefix(prompt) for prompt in prompt_texts]
+        diversity_penalty = None
+
+        if self.diversity_penalty:
+            aspects = [aspect.strip() for aspect in self.get_aspects_from_schema(generated_texts[0])]
+            diversity_penalty = self.get_diversity_penalty(aspects)
+
         if self.append_feedback_to_q:
             # Prepend prompt.
             input_wfeed = []
             cached_wfeed = []
             for input_text, feedback_pred in zip(inputs, generated_texts):
-                # Get text between "Question: " and "\n\nAnswer:"
-                # it = input_text
-                # it = it.replace("\n", " ")
-                # question = re.search("Question: (.*)Answer:", it).group(1).strip()
+            #     # Get text between "Question: " and "\n\nAnswer:"
+            #     # it = input_text
+            #     # it = it.replace("\n", " ")
+            #     # question = re.search("Question: (.*)Answer:", it).group(1).strip()
 
-                aspects = [aspect.strip() for aspect in feedback_pred.split(',')]
                 
                 uncached_aspects = {}
                 cached_aspects = {}
-                for i, aspect in enumerate(aspects):
-                    cache_key = AspectCacheKey(scenario=input_text, aspect=aspect)
-                    cache_val = self.aspect_cache.get(cache_key)
-                    if cache_val:
-                        cached_aspects[i] = (aspect, cache_val.response)
-                    else:
-                        uncached_aspects[i] = (aspect, None)
-                feedback_pred = ', '.join(map(lambda x: x[0], list(uncached_aspects.values())))
+                # for i, aspect in enumerate(aspects):
+                #     cache_key = AspectCacheKey(scenario=input_text, aspect=aspect)
+                #     cache_val = self.aspect_cache.get(cache_key)
+                #     if cache_val:
+                #         cached_aspects[i] = (aspect, cache_val.response)
+                #     else:
+                #         uncached_aspects[i] = (aspect, None)
+                # feedback_pred = ', '.join(map(lambda x: x[0], list(uncached_aspects.values())))
 
                 cached_wfeed.append(cached_aspects)
                 if feedback_pred:
@@ -146,8 +173,9 @@ class EditMatchMetric(BaseMetric):
                 for input_text, feedback_pred in zip(inputs, generated_texts)
             ]
         
-        # print("\n\nThis is input feed", input_wfeed)
+        # print("\n\nThis is input feed", input_wfeed[0])
         # print("-----------------\n\n")
+        # print('Schema: ', generated_texts[0])
 
         # if self.cache_path != "":
             
@@ -179,13 +207,24 @@ class EditMatchMetric(BaseMetric):
 
         gpt_inputs = []
 
-        for inp in input_wfeed:
-            if inp:
+        for inp, cached_res in zip(input_wfeed, cached_wfeed):
+            if not inp and not cached_res:
+                # No schema generated by the schema generator model, return maximum negative reward
+                print('No schema generated by the schema generator model')
+
+                metric_dict = {
+                    "custom_metrics/editmatch_mse": (None, -64.0)
+                }
+                return metric_dict
+
+            elif inp:
                 # then we have to me a call
                 gpt_inputs.append((inp, True))
             else:
                 # then it has been cached
-                gpt_inputs.append((cached_wfeed, False))
+                gpt_inputs.append((cached_res, False))
+
+        # print("\n\nThis is gpt inputs\n\n", gpt_inputs)
 
         gpt_call_1 = get_generations_gpt3(
             ls=gpt_inputs,
@@ -198,34 +237,36 @@ class EditMatchMetric(BaseMetric):
             penalty=0.0,
             n=1,
             keyfile=self.openai_api_key,
-            generate_json=True
+            generate_json=True,
+            use_together_ai_api=self.use_together_ai_api
         )
         
         # merge cached and uncaches results
-        merged_results = []
-        for scenario, uncached_scores, cached_scores in zip(inputs, gpt_call_1, cached_wfeed):
+        # merged_results = []
+        # for scenario, uncached_scores, cached_scores in zip(inputs, gpt_call_1, cached_wfeed):
 
-            # 
-            merged_aspect_scores = {}
-            num_aspects = len(uncached_scores) + len(cached_scores)
+        #     # 
+        #     merged_aspect_scores = {}
+        #     num_aspects = len(uncached_scores) + len(cached_scores)
 
-            uncached_aspect_counter = 0
-            uncached_aspect_keys = list(uncached_scores.keys())
-            for i in range(num_aspects):
-                cached_res = cached_scores.get(i, None)
-                if cached_res:
-                    merged_aspect_scores[cached_res[0]] = cached_res[1]
+        #     uncached_aspect_counter = 0
+        #     uncached_aspect_keys = list(uncached_scores.keys())
+        #     for i in range(num_aspects):
+        #         cached_res = cached_scores.get(i, None)
+        #         if cached_res is not None:
+        #             merged_aspect_scores[cached_res[0]] = cached_res[1]
 
-                else:
-                    uncached_aspect = uncached_aspect_keys[uncached_aspect_counter]
-                    merged_aspect_scores[uncached_aspect] = uncached_scores[uncached_aspect]
-                    uncached_aspect_counter += 1
-                    cache_key = AspectCacheKey(scenario=scenario, aspect=uncached_aspect)
-                    cache_val = AspectCacheValue(response=uncached_scores[uncached_aspect])
-                    self.aspect_cache.set(cache_key, cache_val)
-            merged_results.append(merged_aspect_scores)
-
-            
+        #         else:
+        #             uncached_aspect = uncached_aspect_keys[uncached_aspect_counter]
+        #             merged_aspect_scores[uncached_aspect] = uncached_scores[uncached_aspect]
+        #             uncached_aspect_counter += 1
+        #             cache_key = AspectCacheKey(scenario=scenario, aspect=uncached_aspect)
+        #             cache_val = AspectCacheValue(response=uncached_scores[uncached_aspect])
+        #             self.aspect_cache.set(cache_key, cache_val)
+                
+        #         if uncached_aspect_counter >= len(uncached_aspect_keys):
+        #             break
+        #     merged_results.append(merged_aspect_scores)            
 
         message = """
             You are given a set of aspects and a score for each aspect that tells how the aspect was evaluated for some situation. 
@@ -248,7 +289,7 @@ class EditMatchMetric(BaseMetric):
             Note: The morality score should be strictly an integer in the range -4 to 4.
 
             Response Format:
-            Provide the score in strict JSON format:
+            Return only a single JSON object and nothing else.
             
             {
                 "morality_score": "... integer score in the range -4 to 4"
@@ -257,7 +298,7 @@ class EditMatchMetric(BaseMetric):
 
         all_messages = []
 
-        for obj in merged_results:
+        for obj in gpt_call_1:
             arr = []
             for k, v in obj.items():
                 arr.append(f'{k}: {v}')
@@ -266,9 +307,6 @@ class EditMatchMetric(BaseMetric):
             new_message = message.replace("{{virtue set}}", final_str)
 
             all_messages.append((new_message, True))
-
-        # here, we need to merge
-
 
         final_preds = get_generations_gpt3(
             ls=all_messages,
@@ -282,41 +320,44 @@ class EditMatchMetric(BaseMetric):
             n=1,
             keyfile=self.openai_api_key,
             generate_json=True,
-            final_morality=True
+            final_morality=True,
+            use_together_ai_api=self.use_together_ai_api
         )
+
 
         print("\n\nThis is the final GPT output, ", final_preds)
 
         edit_pred = []
         for obj in final_preds:
             try:
-                edit_pred.append(str(obj["morality_score"]))
+                edit_pred.append(float(obj["morality_score"]))
             except:
-                edit_pred.append(str(0))
+                edit_pred.append(0.0)
 
         print("\n\n This is the edit pred", edit_pred)
 
+
         # if self.cache_path != "":
-        #     # Update cache.
-        #     uncached_queries = [cache_queries[i] for i, _ in uncached_inputs]
-        #     self.GPT3_CACHE.update(dict(zip(uncached_queries, edit_pred)))
+            # # Update cache.
+            # uncached_queries = [cache_queries[i] for i, _ in uncached_inputs]
+            # self.GPT3_CACHE.update(dict(zip(uncached_queries, edit_pred)))
 
-        #     if CALLS % 100 == 0:
-        #         print("Size: ", len(self.GPT3_CACHE), "Attempts: ", ATTEMPTS, "Hits: ", HITS, "Ratio: ", HITS / ATTEMPTS)
-        #         print("Saving cache to", self.cache_path)
-        #         with open(self.cache_path, "w") as f:
-        #             json.dump(self.GPT3_CACHE, f)
-        #     CALLS += 1
+            # if CALLS % 100 == 0:
+            #     print("Size: ", len(self.GPT3_CACHE), "Attempts: ", ATTEMPTS, "Hits: ", HITS, "Ratio: ", HITS / ATTEMPTS)
+            #     print("Saving cache to", self.cache_path)
+            #     with open(self.cache_path, "w") as f:
+            #         json.dump(self.GPT3_CACHE, f)
+            # CALLS += 1
 
-        #     edit_pred = iter(edit_pred)
-        #     uncached_results = [(i, next(edit_pred)) for i, _ in uncached_inputs]
+            # edit_pred = iter(edit_pred)
+            # uncached_results = [(i, next(edit_pred)) for i, _ in uncached_inputs]
 
-        #     # Combine cached and uncached results.
-        #     results = cached_results + uncached_results
+            # # Combine cached and uncached results.
+            # results = cached_results + uncached_results
 
-        #     # Sort results by index.
-        #     results.sort(key=lambda x: x[0])
-        #     edit_pred = [v for _, v in results]
+            # # Sort results by index.
+            # results.sort(key=lambda x: x[0])
+            # edit_pred = [v for _, v in results]
 
         # If len(prompt_texts) = 1, then print.
         if len(edit_pred) <= 2:
@@ -368,7 +409,8 @@ class EditMatchMetric(BaseMetric):
                 init_pred=init_pred,
                 lambda_rouge_input=self.lambda_rouge_input,
             )
-
+        elif self.downstream_metric_name == 'mse':
+            scores = self.downstream_metric(edit_pred, reference_texts, diversity_penalty=diversity_penalty)
         else:
             scores = self.downstream_metric(edit_pred, reference_texts)
 
@@ -421,11 +463,8 @@ class EditMatch(RewardFunction):
             prompt_texts = prompt_or_input_text.split('###')
             # print("This is edit_gold: ", edit_gold)
             reference_texts = [float(a) for a in edit_gold.split('###')]
-
             feedback_pred = input_wfeed.lstrip(prompt_or_input_text)
-            # print("This is the input prompt or input text: ", prompt_or_input_text)
-            # print("And this is the input wfeed: ", input_wfeed)
-            # print("And this is feedback that is schema generateion: ", feedback_pred)
+           
             prompt_or_input_text = prompt_or_input_text.lstrip("Critique: ")
             metric_dict = self.metric.compute(
                 prompt_texts=prompt_texts,
@@ -440,8 +479,9 @@ class EditMatch(RewardFunction):
         return 0
 
 
-def mse_metric(pred: List[str], ref: List[str]) -> float:
+def mse_metric(pred: List[str], ref: List[str], diversity_penalty: float = None) -> float:
     # pred = [float(json.loads(i)["morality_score"]) for i in pred]
+
     pred = np.array([float(i) for i in pred])
     ref = np.array([float(i) for i in ref])
     res = MSEMetric().compute(torch.tensor(pred), torch.tensor(ref))
@@ -449,6 +489,10 @@ def mse_metric(pred: List[str], ref: List[str]) -> float:
     mse_penalty = res['semantic/mse'][-1]
 
     reward = sign_reward - mse_penalty.numpy()
+
+    print("\n\nThis is diversity penalty: ", diversity_penalty)
+    if diversity_penalty:
+        reward -= diversity_penalty
     print('reward obtained', reward)
     return {"mse": reward.mean()}
 

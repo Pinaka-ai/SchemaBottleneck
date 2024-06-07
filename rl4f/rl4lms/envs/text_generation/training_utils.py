@@ -81,12 +81,14 @@ def build_datapool(datapool_config: Dict[str, Any]):
 def build_env(env_config: Dict[str, Any],
               reward_fn: RewardFunction,
               tokenizer: AutoTokenizer,
-              train_samples: List[Sample]):
+              train_samples: List[Sample],
+              obs_prompt: str):
     # vectoried env
     env_kwargs = {
         "reward_function": reward_fn,
         "tokenizer": tokenizer,
         "samples": train_samples,
+        "obs_prompt": obs_prompt
     }
     env_kwargs = {**env_kwargs, **env_config.get("args", {})}
     env = make_vec_env(TextGenEnv,
@@ -139,7 +141,8 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
                  on_policy_alg_config: Dict[str, Any],
                  train_eval_config: Dict[str, Any],
                  tracker: Tracker = None,
-                 experiment_name: str = ''
+                 experiment_name: str = '',
+                 prompt: str = ''
                  ):
         self._tokenizer_config = tokenizer_config
         self._datapool_config = datapool_config
@@ -149,6 +152,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
         self._train_eval_config = train_eval_config
         self._tracker = tracker
         self._experiment_name = experiment_name
+        self.obs_prompt = prompt
         self._setup()
 
     def _setup(self):
@@ -164,7 +168,7 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
             self._datapool_config)
 
         self._env = build_env(self._env_config, self._reward_fn,
-                              self._tokenizer, self._samples_by_split["train"])
+                              self._tokenizer, self._samples_by_split["train"], self.obs_prompt)
         self._alg = build_alg(self._on_policy_alg_config,
                               self._env, self._tracker,
                               self._policy_state_dict,
@@ -194,6 +198,21 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
                                 split_name=split,
                                 tracker=self._tracker,
                                 gen_kwargs=self._eval_gen_kwargs)
+    
+    # def _evaluate_morality(self, epoch: int,
+    #                            splits: List[str] = ["val"]):
+    #     for split in splits:
+    #         evaluate_morality_on_samples(policy=self._alg.policy,
+    #                             tokenizer=self._tokenizer,
+    #                             samples=self._samples_by_split[split],
+    #                             batch_size=self._eval_batch_size,
+    #                             max_prompt_length=self._max_prompt_length,
+    #                             metrics=self._metrics,
+    #                             epoch=epoch,
+    #                             split_name=split,
+    #                             tracker=self._tracker,
+    #                             gen_kwargs=self._eval_gen_kwargs)
+
 
     def train_and_eval(self):
         # evaluate on val and test set before fine-tuning once
@@ -212,12 +231,14 @@ class OnPolicyTrainer(TrainerWarmStartMixin):
             if (epoch + 1) % self._train_eval_config.get("save_every", 20) == 0:
                 self.save_trainer_state(
                     self._tracker, self._alg.policy, self._trainer_state)
-            
-            print(f'{epoch}: *'*200)
 
             # evaluate on val and test set in the given intervals
             # if (epoch + 1) % self._train_eval_config["eval_every"] == 0:
-                # self._evaluate_on_datapools(epoch=epoch, splits=["val", "test"])
+            #     if self._datapool_config["id"] != "morality":
+            #         self._evaluate_on_datapools(epoch=epoch, splits=["val", "test"])
+            #     else:
+            #         # custom implementation
+            #         self._evaluate_on_datapools(epoch=epoch, splits=["val"])
 
 
         # finally evaluate on val and test samples

@@ -14,7 +14,7 @@ DIVERSITY_PENALTY="without_diversity_penalty"
 # Project name and experiment name - used for wandb logging and output folder.
 PROJECT_NAME="ppo_checkpoints_test"
 CURRENT_TIMESTAMP=$(date +"%Y-%m-%d-%H-%M-%S")
-EXPERIMENT_NAME="t5large|n_envs=4|n_steps=512|n_iters=50|batch_size=8|priority_sampling=True|caching=False|$CURRENT_TIMESTAMP"
+EXPERIMENT_NAME="t5large|n_envs=1|n_steps=50|n_iters=50|batch_size=8|priority_sampling=True|caching=False|$CURRENT_TIMESTAMP"
 
 mkdir -p $BASE_PATH/$PROJECT_NAME/$MODEL_NAME/$DIVERSITY_PENALTY/$EXPERIMENT_NAME
 
@@ -28,4 +28,4 @@ python scripts/training/train_text_generation.py \
 --project_name $PROJECT_NAME \
 --experiment_name $EXPERIMENT_NAME \
 --entity_name pvashisht \
---log_to_wandb
+# --log_to_wandb

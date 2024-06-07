@@ -27,5 +27,5 @@ python scripts/training/train_text_generation.py \
 --config_path scripts/training/task_configs/openai_summ/t5_ppo_schema_bottleneck.yml \
 --project_name $PROJECT_NAME \
 --experiment_name $EXPERIMENT_NAME \
---entity_name pvashisht \
+--entity_name debanjanmondal702 \
 --log_to_wandb

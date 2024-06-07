@@ -18,6 +18,7 @@ from stable_baselines3.common.utils import obs_as_tensor
 from stable_baselines3.common.vec_env import VecEnv
 from transformers import PreTrainedTokenizer
 from myutil import ForkedPdb
+import json
 
 def unpack_observations(obs_tensor, n_envs: int):
     """
@@ -41,6 +42,7 @@ def compute_batched_rewards(episode_wise_transitions: Dict[str, List[Tuple]],
     generated_texts = []
     is_dones = []
     indices = []
+
     for env_ix, transitions in enumerate(episode_wise_transitions):
         for trans_ix, transition in enumerate(transitions):
             done = transition[8]
@@ -132,7 +134,6 @@ def wrap_onpolicy_alg(alg_class: Type[OnPolicyAlgorithm],
             for actions_tensor, log_probs, action_mask in zip(gen_output["step_wise_actions"],
                                                               gen_output["step_wise_logprobs"],
                                                               masks):
-                #  actions_tensor num_envs x 1
                 # sanity check
                 assert torch.all(torch.isfinite(log_probs)
                                  ), "Infinite values in log probs"
@@ -184,7 +185,6 @@ def wrap_onpolicy_alg(alg_class: Type[OnPolicyAlgorithm],
                 # step into env to get rewards
                 actions = actions_tensor.cpu().numpy()  # num_envs x 1
                 new_obs, rewards, dones, infos = self.env.step(actions)
-
                
                 self.num_timesteps += self.env.num_envs
 
@@ -194,10 +194,26 @@ def wrap_onpolicy_alg(alg_class: Type[OnPolicyAlgorithm],
                 # unpack individual observations
                 unpacked_obs = unpack_observations(
                     obs_tensor, self.env.num_envs)
+                
+                # print(unpacked_obs)
 
                 # store episode wise transitions separately
                 for env_ix in range(self.env.num_envs):
                     # only if not terminated already
+                    # print("\nThese are unpacked observations\n", unpacked_obs[env_ix])
+                    # print("\nThese are actions\n", actions[env_ix])
+                    # print("\nThese are rewards for the environment", rewards[env_ix])
+                    # print(total_rewards[env_ix])
+                    # print(kl_div.cpu().numpy()[env_ix])
+                    # print("\nThis is where episode starts", episode_starts[env_ix])
+                    # print("\nThese are the values", values[env_ix].cpu())
+                    # print(log_probs[env_ix].cpu())
+                    # print("\nThis is dones:", dones[env_ix])
+                    # print(ref_log_probs[env_ix].cpu())
+                    # print(kl_rewards.cpu().numpy()[env_ix])
+                    # print("\n\nLet's check: ", action_mask[env_ix].cpu().numpy(  # 11
+                    #             ) if action_mask is not None else None,
+                    #             infos[env_ix])
                     if not ep_terminated[env_ix]:
                         # TBD: change this DS to dict
                         episode_wise_transitions[env_ix].append(
@@ -227,8 +243,12 @@ def wrap_onpolicy_alg(alg_class: Type[OnPolicyAlgorithm],
                 current_obs = new_obs
 
             # now we flush all episode wise info to the 1-D buffer
+            # print("\n\nThis is episode wise transitions", episode_wise_transitions[0])
+            # return
+        
             rollout_info = self._add_to_buffer(
                 rollout_buffer, episode_wise_transitions, rollout_info)
+
             return rollout_info
 
         def _add_to_buffer(self, rollout_buffer, episode_wise_transitions, rollout_info):
@@ -238,6 +258,7 @@ def wrap_onpolicy_alg(alg_class: Type[OnPolicyAlgorithm],
                     episode_wise_transitions, self.reward_fn)
 
             advantages_computed = False
+
             for ep_ix, transitions in enumerate(episode_wise_transitions):
                 ep_length = len(transitions)
                 total_reward = 0.0

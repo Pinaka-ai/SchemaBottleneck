@@ -54,6 +54,23 @@ class Morality(TextGenPool):
         pool_instance = cls(samples)
         return pool_instance
 
+    def __getitem__(self, ix: int) -> Sample:
+        if ix >= len(self):
+            raise StopIteration
+        sample = self._samples[ix]
+        split, id_ = sample.id.split('_')
+        id_ = int(id_)
+        weight = 1.0
+
+        # if training put greater weight on mbench samples
+        if split == 'train':
+            if id_ >= 96:
+                weight = 1 / 1000
+            else:
+                weight = 1 / 96
+
+        return sample, weight
+
 
 class Interscript(TextGenPool):
     @classmethod

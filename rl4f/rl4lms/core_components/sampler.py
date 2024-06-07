@@ -25,7 +25,7 @@ class PrioritySampler:
     def sample(self, size: int) -> List[Any]:
         min_sample_size = min(len(self.items), size)
         scaled_item_priorities = np.array(self.item_priorities) ** self.priority_scale
-        sample_probs = scaled_item_priorities / np.sum(scaled_item_priorities)
+        sample_probs = scaled_item_priorities / np.sum(scaled_item_priorities)           # (1 / 2 * 96)  (1 / 2 * 1000) 
         samples = np.random.choice(a=self.items, p=sample_probs, size=min_sample_size)
         return samples
 

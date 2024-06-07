@@ -17,7 +17,6 @@ def get_batch(samples: List[Sample], batch_size: int):
         yield current_batch
         current_ix += batch_size
 
-
 def evaluate_on_samples(policy: BasePolicy,
                         tokenizer: AutoTokenizer,
                         samples: List[Sample],
