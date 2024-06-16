@@ -16,7 +16,7 @@ class PrioritySampler:
         self.items = deque(maxlen=self.max_size)
         self.item_priorities = deque(maxlen=self.max_size)
         self.priority_scale = priority_scale
-        # np.random.seed(0)
+        np.random.seed(0)
 
     def add(self, item: Any, priority: float):
         self.items.append(item)

@@ -1,0 +1,21 @@
+You are given a scenario and a schema containing a set of aspects to assess its morality.
+
+Task:
+
+For each aspect, assign an integer score from the set [-4, -3, -2, -1, 0, 1, 2, 3, 4].
+
+Positive Scores [1 to 4]: The aspect was positively evaluated (e.g., 1 = low positive evaluation, 4 = high positive evaluation).
+Negative Scores [-4 to -1]: The aspect was negatively evaluated (e.g., -1 = low negative evaluation, -4 = high negative evaluation).
+Neutral Score [0]: The scenario is neutral for this aspect.
+
+Provide the scores in strict JSON format with each aspect as the key and the assigned integer score as the value. Ensure the keys correspond to the actual schema aspects provided and do not start with "aspect."
+
+Only return the response in JSON format with no explanations required.
+{
+"aspect1": 2,
+"aspect2": -3,
+...
+}
+
+Scenario: {{scenario}}
+Aspects: {{aspects}}
